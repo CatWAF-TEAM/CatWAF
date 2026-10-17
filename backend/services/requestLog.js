@@ -192,35 +192,15 @@ const OFFSET_KEY = 'audit_log_offset'
 // next call.
 const MAX_READ_BYTES = 8 * 1024 * 1024
 
-let lastReadOffset = null
-
-function loadOffset(path, size) {
-  if (lastReadOffset !== null) return lastReadOffset
-  try {
-    const saved = db.getState(OFFSET_KEY)
-    // Tied to the path it was recorded for: the effective audit log can move
-    // (see caddy.js audit-log resolution), and an offset from a different
-    // file is meaningless.
-    if (saved && saved.path === path && Number.isFinite(saved.offset)) {
-      lastReadOffset = Math.min(saved.offset, size)
-      return lastReadOffset
-    }
-  } catch { /* fall through to a cold start */ }
-  lastReadOffset = 0
-  return lastReadOffset
-}
-
-function saveOffset(path, offset) {
-  lastReadOffset = offset
-  try { db.setState(OFFSET_KEY, { path, offset }) } catch { /* best effort */ }
-}
-
 // Reads one bounded chunk of `filePath` starting at `offset`. Returns how
 // many rows were ingested and the offset consumed up to. Never advances past
 // a partially written line.
-function ingestChunk(filePath, offset) {
+function ingestChunk(filePath, offset, maxBytes = MAX_READ_BYTES) {
   let stat
-  try { stat = fs.statSync(filePath) } catch { return { ingested: 0, consumedTo: offset, missing: true } }
+  try { stat = fs.statSync(filePath) } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    return { ingested: 0, consumedTo: offset, missing: true }
+  }
 
   let from = offset
   // Truncated or replaced underneath us — start over. Entry ids are derived
@@ -228,7 +208,7 @@ function ingestChunk(filePath, offset) {
   if (stat.size < from) from = 0
   if (stat.size === from) return { ingested: 0, consumedTo: from, eof: true }
 
-  const length = Math.min(stat.size - from, MAX_READ_BYTES)
+  const length = Math.min(stat.size - from, MAX_READ_BYTES, maxBytes)
   const buf = Buffer.alloc(length)
 
   let read = 0
@@ -262,15 +242,31 @@ function ingestChunk(filePath, offset) {
 }
 
 function ingestNewEntries() {
-  const filePath = caddySvc.AUDIT_LOG_PATH
-  let size
-  try { size = fs.statSync(filePath).size } catch { return { ingested: 0, reason: 'audit log not found (Coraza not running or SecAuditEngine off)' } }
-
-  const offset = loadOffset(filePath, size)
-  const r = ingestChunk(filePath, offset)
-  if (r.missing) return { ingested: 0, reason: 'audit log not found' }
-  if (r.consumedTo !== offset) saveOffset(filePath, r.consumedTo)
-  return { ingested: r.ingested }
+  // Old generations can append after several subsequent reloads. Follow all
+  // retained files, with a separate inode-bound cursor and one total read cap.
+  const files = require('./auditLog').listFiles(caddySvc.baseAuditLogPath()).reverse()
+  if (!files.length) return { ingested: 0, reason: 'audit log not found (Coraza not running or SecAuditEngine off)' }
+  const saved = db.getStateStrict(OFFSET_KEY)
+  const offsets = saved?.files && typeof saved.files === 'object' ? saved.files : {}
+  const next = Object.create(null)
+  let ingested = 0, budget = MAX_READ_BYTES
+  for (const file of files) {
+    let stat
+    try { stat = fs.statSync(file.path, { bigint: true }) }
+    catch (error) { if (error.code === 'ENOENT') continue; throw error }
+    const id = require('./auditWriters').identity(stat)
+    const old = offsets[file.path]
+    const offset = old?.id === id && Number.isSafeInteger(old.offset) && old.offset >= 0 && old.offset <= Number(stat.size) ? old.offset : 0
+    next[file.path] = { id, offset }
+    if (budget <= 0) continue
+    const result = ingestChunk(file.path, offset, budget)
+    ingested += result.ingested
+    next[file.path].offset = result.consumedTo
+    budget -= Math.min(budget, Math.max(0, Number(stat.size) - offset))
+  }
+  // If this write fails, a later pass safely replays deterministic row IDs.
+  db.setState(OFFSET_KEY, { files: next })
+  return { ingested }
 }
 
 // Drains a file that no longer has a writer (a rotated-away audit log),
@@ -282,10 +278,11 @@ function drainFile(filePath) {
   for (let i = 0; i < 10000; i++) {
     const r = ingestChunk(filePath, offset)
     total += r.ingested
-    if (r.missing || r.partial || r.eof || r.consumedTo === offset) break
+    if (r.missing || r.eof) return { ingested: total, complete: true }
+    if (r.partial || r.consumedTo === offset) return { ingested: total, complete: false }
     offset = r.consumedTo
   }
-  return { ingested: total }
+  return { ingested: total, complete: false }
 }
 
 function getRecent(limit = 50) {
@@ -463,7 +460,6 @@ module.exports = {
   ingestChunk,
   drainFile,
   _resetOffsetForTests: () => {
-    lastReadOffset = 0
-    try { db.setState(OFFSET_KEY, { path: null, offset: 0 }) } catch {}
+    try { db.setState(OFFSET_KEY, { files: {} }) } catch {}
   },
 }

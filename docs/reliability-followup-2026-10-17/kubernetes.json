@@ -1,0 +1,61 @@
+{
+  "kindVersion": "kind v0.33.0 go1.26.7 linux/amd64",
+  "nodes": [
+    {
+      "name": "catwaf-free-fix-20261017-control-plane",
+      "nodeInfo": {
+        "architecture": "amd64",
+        "containerRuntimeVersion": "containerd://2.3.4",
+        "kernelVersion": "6.18.33.2-microsoft-standard-WSL2",
+        "kubeletVersion": "v1.37.0",
+        "operatingSystem": "linux",
+        "osImage": "Debian GNU/Linux 13 (trixie)"
+      },
+      "ready": "True"
+    }
+  ],
+  "checks": [
+    {
+      "name": "non-root deployment and private writer observer are healthy",
+      "ok": true
+    },
+    {
+      "name": "actual controller credentials cannot read Secrets or other namespaces",
+      "ok": true
+    },
+    {
+      "name": "real Service routing, mounted TLS and Coraza blocking",
+      "ok": true
+    },
+    {
+      "name": "controller permission outage preserves the active route",
+      "ok": true
+    },
+    {
+      "name": "late audit completion survives rotations across separate containers",
+      "ok": true
+    },
+    {
+      "name": "kubelet TLS rotation replaces the served certificate",
+      "ok": true
+    },
+    {
+      "name": "invalid mounted TLS update retains the last working certificate",
+      "ok": true
+    },
+    {
+      "name": "application rollout and ingress path updates reconcile automatically",
+      "ok": true
+    },
+    {
+      "name": "Pod recreation preserves configuration, certificates and SQLite",
+      "ok": true
+    },
+    {
+      "name": "deleting the Ingress removes the managed HTTP route",
+      "ok": true
+    }
+  ],
+  "backendImageId": "sha256:6d3e2d946e92ae7e566ad3a728aa38e4a9967d0c0550939ab496673413313f1b",
+  "caddyImageId": "sha256:8e9ac49094a6ed99d58d80e30bea937670b57f34e50cae37ef89ce1fbef5b054"
+}

@@ -18,6 +18,7 @@ RUN xcaddy build v2.11.7 --output /usr/bin/caddy \
     --with github.com/corazawaf/coraza-caddy/v2@v2.6.2 \
     --with golang.org/x/net/http2@v0.61.0 \
     --with golang.org/x/crypto/cryptobyte@v0.58.0
+RUN setcap -r /usr/bin/caddy
 
 FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
 WORKDIR /app

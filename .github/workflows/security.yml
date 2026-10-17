@@ -6,6 +6,39 @@ on:
 permissions:
   contents: read
 jobs:
+  kubernetes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install locked test dependencies
+        run: npm ci --ignore-scripts
+      - name: Install verified cluster tools
+        run: |
+          mkdir -p "$RUNNER_TEMP/cluster-tools"
+          cd "$RUNNER_TEMP/cluster-tools"
+          curl --fail --location --retry 3 -o kind https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          echo 'aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  kind' | sha256sum -c -
+          curl --fail --location --retry 3 -o kubectl https://dl.k8s.io/release/v1.37.1/bin/linux/amd64/kubectl
+          echo '65691ff77eb6fa44c908b77a1082c9f092c3b9733b5cefabec0d1104890e21a8  kubectl' | sha256sum -c -
+          chmod +x kind kubectl
+          echo "$RUNNER_TEMP/cluster-tools" >> "$GITHUB_PATH"
+      - name: Build hardened runtime images
+        run: |
+          docker build -t catwaf-backend:k8s-test .
+          docker build -f docker/Caddy.Dockerfile -t catwaf-caddy:k8s-test .
+      - name: Create real disposable Kubernetes cluster
+        run: |
+          kind create cluster --name catwaf-ci --kubeconfig "$RUNNER_TEMP/catwaf-kubeconfig" --wait 120s --image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+          kind load docker-image catwaf-backend:k8s-test catwaf-caddy:k8s-test --name catwaf-ci
+      - name: Exercise real cluster routing, RBAC, rotation and recovery
+        run: CATWAF_K8S_TEST_KUBECONFIG="$RUNNER_TEMP/catwaf-kubeconfig" npm run test:kubernetes
+      - name: Delete disposable cluster
+        if: always()
+        run: kind delete cluster --name catwaf-ci
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 60

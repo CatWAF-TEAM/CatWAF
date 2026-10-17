@@ -1,0 +1,27 @@
+[
+  {
+    "image": "booknook-apache",
+    "exitCode": 0,
+    "findings": []
+  },
+  {
+    "image": "booknook-php",
+    "exitCode": 0,
+    "findings": []
+  },
+  {
+    "image": "fake-web-php",
+    "exitCode": 0,
+    "findings": []
+  },
+  {
+    "image": "catwaf-fixture-nginx",
+    "exitCode": 0,
+    "findings": []
+  },
+  {
+    "image": "catwaf-fixture-database",
+    "exitCode": 0,
+    "findings": []
+  }
+]

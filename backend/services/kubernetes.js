@@ -3,6 +3,7 @@ const http = require('http')
 const https = require('https')
 const crypto = require('crypto')
 const net = require('net')
+const path = require('path')
 const settings = require('./settings')
 const managed = require('./managedRoutes')
 const ACCOUNT = '/var/run/secrets/kubernetes.io/serviceaccount'
@@ -68,6 +69,22 @@ function tlsPair(secret, host) {
   if (!x509.checkPrivateKey(crypto.createPrivateKey(key)) || !matched || Date.parse(x509.validTo) <= Date.now() || Date.parse(x509.validFrom) > Date.now()) throw new Error('TLS certificate does not match its host/key or is not currently valid')
   return { cert, key }
 }
+function mountedTlsSecret(root, name) {
+  if (!NAME.test(name) || name.length > 253) throw new Error('Invalid mounted TLS Secret name')
+  const dir = path.resolve(root, name)
+  // Kubelet swaps ..data atomically. Read both files from one generation;
+  // resolving each file separately can mix certificates during rotation.
+  const generation = fs.realpathSync(path.join(dir, '..data'))
+  const relative = path.relative(dir, generation)
+  if (!relative || relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw new Error('TLS Secret generation escaped its mount')
+  const read = file => {
+    const target = path.join(generation, file)
+    const stat = fs.lstatSync(target)
+    if (!stat.isFile() || stat.size > 384 * 1024) throw new Error('Invalid mounted TLS Secret file')
+    return fs.readFileSync(target).toString('base64')
+  }
+  return { type: 'kubernetes.io/tls', data: { 'tls.crt': read('tls.crt'), 'tls.key': read('tls.key') } }
+}
 async function plan(api, cfg) {
   const ns = encodeURIComponent(cfg.namespace)
   const cls = await api.get('/apis/networking.k8s.io/v1/ingressclasses/' + encodeURIComponent(cfg.ingress_class))
@@ -90,7 +107,9 @@ async function plan(api, cfg) {
       let tlsRef
       if (tls) {
         if (!NAME.test(tls.secretName || '') || tls.secretName.length > 253) throw new Error('Ingress TLS requires a same-namespace Secret')
-        if (!fetched.has(tls.secretName)) fetched.set(tls.secretName, await api.get('/api/v1/namespaces/' + ns + '/secrets/' + encodeURIComponent(tls.secretName)))
+        if (!fetched.has(tls.secretName)) fetched.set(tls.secretName, process.env.CATWAF_K8S_TLS_DIR
+          ? mountedTlsSecret(process.env.CATWAF_K8S_TLS_DIR, tls.secretName)
+          : await api.get('/api/v1/namespaces/' + ns + '/secrets/' + encodeURIComponent(tls.secretName)))
         const pair = tlsPair(fetched.get(tls.secretName), host)
         tlsRef = crypto.createHash('sha256').update(pair.cert).update(pair.key).digest('hex')
         certificates[tlsRef] = pair
@@ -125,4 +144,4 @@ async function scan({ dryRun = null, api = null } = {}) {
   } finally { inFlight = false }
 }
 function describe() { return { ...settings.get('kubernetes'), running: inFlight, last, routes: managed.read().kubernetes?.routes || [] } }
-module.exports = { client, list, resolveService, tlsPair, plan, scan, describe }
+module.exports = { client, list, resolveService, tlsPair, mountedTlsSecret, plan, scan, describe }

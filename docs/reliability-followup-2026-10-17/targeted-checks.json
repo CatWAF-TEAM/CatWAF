@@ -1,0 +1,17 @@
+[
+  {
+    "name": "reload-reproducer",
+    "exitCode": 1,
+    "tail": "{\"coraza\":false,\"catwafApi\":false,\"reloads\":20,\"concurrency\":4,\"passed\":477,\"failed\":16,\"errors\":[\"socket hang up\",\"socket hang up\",\"socket hang up\",\"connect ECONNRESET 127.0.0.1:41293\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\",\"socket hang up\"]}\n"
+  },
+  {
+    "name": "audit-lifetime-final",
+    "exitCode": 0,
+    "tail": "\u2714 a request finishing after multiple rotations retains its audit record (10312.285587ms)\n\u2139 {\"rotations\":[[],[],[{\"name\":\"audit-20261017T201041Z.json\",\"reason\":\"beyond max files\"}]],\"originalLogExists\":true,\"matchingAuditRows\":1}\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 10433.849398\n"
+  },
+  {
+    "name": "govulncheck",
+    "exitCode": 0,
+    "tail": "=== Symbol Results ===\n\nNo vulnerabilities found.\n\nYour code is affected by 0 vulnerabilities.\nThis scan also found 0 vulnerabilities in packages you import and 1\nvulnerability in modules you require, but your code doesn't appear to call these\nvulnerabilities.\nUse '-show verbose' for more details.\n"
+  }
+]

@@ -16,8 +16,8 @@
 //
 //   1. pick the next active path
 //   2. repoint SecAuditLog at it, validated, backed up, reloaded
-//   3. the previous file now has NO writer -> drain it into the database
-//   4. keep it as an archive; prune archives by age and count
+//   3. ingest the previous file and keep following its late writes
+//   4. prune only after proving no proxy descriptor can still write to it
 //
 // Nothing is ever truncated, and the file being retired is fully ingested
 // before it can be pruned. The active file is never a deletion candidate.
@@ -264,7 +264,8 @@ function recoverLocked(basePath) {
   try { caddyfileMentionsTo = caddySvc.readCaddyfile().includes(`SecAuditLog ${to}`) } catch {}
 
   if (caddyfileMentionsTo) {
-    // The repoint landed — complete it: the old file has no writer now.
+    // The repoint landed. Keep the old file available for late writes;
+    // completion of this journal does not establish writer retirement.
     const drained = from ? drain(from) : { ok: true }
     if (drained && drained.error) {
       // Could not ingest the retired log yet. Keep the pending marker so
@@ -309,6 +310,8 @@ function pruneLocked(env) {
   const archives = listFiles(base).filter(f => f.path !== active && !referenced.has(f.path))
   const deleted = []
   const failed = []
+  const deferred = []
+  let writers
 
   archives.forEach((f, index) => {
     if (pendingPaths.includes(f.path)) return
@@ -318,6 +321,15 @@ function pruneLocked(env) {
     const tooMany = index >= cfg.maxFiles
     if (!tooOld && !tooMany) return
     try {
+      writers ||= require('./auditWriters').snapshot()
+      if (!writers.ok) { deferred.push({ name: f.name, reason: writers.error }); return }
+      const stat = fs.statSync(f.path, { bigint: true })
+      if (writers.writers.has(require('./auditWriters').identity(stat))) {
+        deferred.push({ name: f.name, reason: 'Proxy still holds an audit writer' }); return
+      }
+      const drained = drain(f.path)
+      if (drained.error) throw new Error(drained.error)
+      if (!drained.complete) { deferred.push({ name: f.name, reason: 'Audit record is incomplete or drain budget is exhausted' }); return }
       fs.unlinkSync(f.path)
       deleted.push({ name: f.name, reason: tooOld ? 'older than retention' : 'beyond max files' })
     } catch (e) {
@@ -325,7 +337,7 @@ function pruneLocked(env) {
     }
   })
 
-  return { deleted, failed, kept: archives.length - deleted.length }
+  return { deleted, failed, deferred, kept: archives.length - deleted.length }
 }
 
 // Rotate now. Safe to call when rotation is not needed — callers decide.
@@ -351,7 +363,12 @@ function rotateLocked({ env = process.env, reason = 'manual' } = {}) {
   // moment the reload lands.
   try {
     fs.mkdirSync(path.dirname(to), { recursive: true, mode: 0o750 })
-    fs.closeSync(fs.openSync(to, 'wx', 0o660))
+    const fd = fs.openSync(to, 'wx', 0o660)
+    try {
+      // Creation mode is filtered by umask. The separate proxy UID needs the
+      // shared group's write bit before validation opens this new generation.
+      fs.fchmodSync(fd, 0o660)
+    } finally { fs.closeSync(fd) }
   } catch (e) {
     return { ok: false, error: `Cannot create the next audit log (${to}): ${e.code || e.message}` }
   }
@@ -389,8 +406,8 @@ function rotateLocked({ env = process.env, reason = 'manual' } = {}) {
     }
   }
 
-  // The reload landed: `from` has no writer any more. Drain it completely
-  // before it can ever become a pruning candidate.
+  // Reload acknowledgement does not retire in-flight writers. Ingest what is
+  // available now; requestLog follows late appends and prune proves retirement.
   const drained = drain(from)
   if (drained && drained.error) {
     // Ingestion failed (e.g. database unavailable). Leave the pending

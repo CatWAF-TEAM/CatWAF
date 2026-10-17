@@ -233,6 +233,21 @@ build the dashboard when building images, rather than running the native setup
 wizard inside a container. Database restore uses a stopped-stack, one-shot
 backend container; see [security-recovery.md](security-recovery.md).
 
+The proxy image starts the original Caddy binary through a small Node.js
+supervisor. Its private `/run/catwaf-admin/audit-writers.sock` reports writable
+file identities so the backend can retain audit archives while old requests
+finish. Keep this socket volume shared only with the backend, and preserve the
+separate user IDs. No network observer port, shared PID namespace or additional
+capability is required. The supervisor forwards termination signals to Caddy.
+
+Audit ingestion follows retained generations after rotation. Deletion requires
+both a successful final drain and proof that Caddy has closed the file. If the
+observer is unavailable, files are retained; configured age/count limits can be
+exceeded. Monitor audit-directory disk usage and restore the observer instead
+of deleting an archive still held by the proxy. Native Linux installations use
+`/proc` when permissions permit; other platforms require an observer or retain
+archives without automatic pruning.
+
 When upgrading existing volumes from the root-running Caddy image, stop and
 back up the stack first. Preserve certificate storage, and set the ownership
 of Caddy's `/data` and `/config` contents to UID 1001 / GID 1000. Shared

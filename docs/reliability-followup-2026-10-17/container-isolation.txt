@@ -1,0 +1,1 @@
+Container checks passed: health, allowed request, admin socket, origin isolation, distinct non-root backend/proxy UIDs, private DB unreadable by Caddy, no Docker socket and SQLi block.

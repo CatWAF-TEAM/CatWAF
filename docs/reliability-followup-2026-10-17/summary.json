@@ -1,0 +1,85 @@
+{
+  "baseCommit": "c0c6019cf6e0fa260f060096353834d2c8efcbec",
+  "sourceHashes": "source-sha256.json",
+  "strictSuiteFiles": {
+    "passed": 35,
+    "failed": 1,
+    "failedFile": "reliability-e2e.test.js"
+  },
+  "realKubernetes": {
+    "passed": 10,
+    "failed": 0,
+    "evidence": "kubernetes.json"
+  },
+  "nonRootChecks": {
+    "auditRotationPassed": 61,
+    "catAIPassed": 66,
+    "failed": 0
+  },
+  "openapi": {
+    "passed": 76,
+    "failed": 0,
+    "warnings": 0
+  },
+  "filesystemFaultsPassed": 9,
+  "upgradeEditionCasesPassed": 4,
+  "browserChecksPassed": 72,
+  "containerRecoveryPassed": 8,
+  "dockerAutoconfPassed": 5,
+  "crowdSecPassed": 6,
+  "configFindings": 0,
+  "secretFindings": 0,
+  "npmFindings": 0,
+  "imageBlocker": "GO-2026-5932",
+  "semgrep": {
+    "rawExitCode": 1,
+    "warningCount": 1,
+    "assessment": "HTML report fields escaped; existing XSS regression passed; raw warning retained"
+  },
+  "releaseGate": "failed",
+  "load": {
+    "startedAt": "2026-10-17T20:17:47.500Z",
+    "requestedSeconds": 900,
+    "concurrency": 24,
+    "paceMs": 100,
+    "limits": {
+      "errors": 0,
+      "bypasses": 0,
+      "duplicateWrites": 0,
+      "p99Ms": 5000,
+      "rssMiB": 768,
+      "diskMiB": 1024,
+      "descriptors": 2048
+    },
+    "status": "failed",
+    "requests": 138352,
+    "writes": 34594,
+    "reloads": 421,
+    "rotations": 46,
+    "h2UnprocessedRefusals": 4,
+    "errorCount": 94,
+    "peakRssMiB": 171.84375,
+    "peakDiskMiB": 552.8572759628296,
+    "peakDescriptors": 113,
+    "protocols": {
+      "http": 46776,
+      "https": 45866,
+      "h2": 45710
+    },
+    "runtimeSourceSha256": "eb97c04172fd56ed77b98aec66fb08553bc5cdaf7921424f93f2bb7bfead53fa",
+    "nodeVersion": "v24.19.0",
+    "proxyVersion": "v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4=",
+    "proxySha256": "7e2adaa80b0bf1ebd1356c69b8caefeb8e213babd826afbedb96f997ac2f250f",
+    "elapsedSeconds": 900.6808367219999,
+    "expectedWrites": 34614,
+    "bypasses": 0,
+    "duplicateWrites": 0,
+    "p99Ms": 622,
+    "caddyExit": {
+      "code": 0,
+      "signal": null
+    },
+    "finishedAt": "2026-10-17T20:32:50.536Z"
+  },
+  "completedAt": "2026-10-17T20:32:50.536Z"
+}

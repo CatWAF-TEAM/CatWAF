@@ -1,0 +1,326 @@
+[
+  {
+    "file": "apps-api.test.js",
+    "status": 0,
+    "seconds": 20.19,
+    "summaries": [
+      "37 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "attack.test.js",
+    "status": 0,
+    "seconds": 24.35,
+    "summaries": [
+      "142 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "audit-lifetime-e2e.test.js",
+    "status": 0,
+    "seconds": 9.64,
+    "summaries": [
+      "\u2139 tests 1",
+      "\u2139 pass 1",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "audit-log.test.js",
+    "status": 0,
+    "seconds": 0.08,
+    "summaries": [
+      "2 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "audit-rotation.test.js",
+    "status": 0,
+    "seconds": 12.6,
+    "summaries": [
+      "58 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "audit-writers.test.js",
+    "status": 0,
+    "seconds": 0.92,
+    "summaries": [
+      "\u2139 tests 4",
+      "\u2139 pass 4",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "catai.test.js",
+    "status": 0,
+    "seconds": 4.88,
+    "summaries": [
+      "65 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "concurrency.test.js",
+    "status": 0,
+    "seconds": 2.08,
+    "summaries": [
+      "16 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "discovery.test.js",
+    "status": 0,
+    "seconds": 2.56,
+    "summaries": [
+      "291 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "edge-e2e.test.js",
+    "status": 0,
+    "seconds": 0.63,
+    "summaries": [
+      "13 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "edition.test.js",
+    "status": 0,
+    "seconds": 3.35,
+    "summaries": [
+      "165 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "extensions.test.js",
+    "status": 0,
+    "seconds": 11.79,
+    "summaries": [
+      "35 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "feature-parity.test.js",
+    "status": 0,
+    "seconds": 1.88,
+    "summaries": [
+      "\u2139 tests 9",
+      "\u2139 pass 9",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "features.test.js",
+    "status": 0,
+    "seconds": 3.58,
+    "summaries": [
+      "32 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "healthcheck.test.js",
+    "status": 0,
+    "seconds": 1.07,
+    "summaries": [
+      "\u2139 tests 7",
+      "\u2139 pass 7",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "image-policy.test.js",
+    "status": 0,
+    "seconds": 0.09,
+    "summaries": [
+      "\u2139 tests 6",
+      "\u2139 pass 6",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "openapi-drift.test.js",
+    "status": 0,
+    "seconds": 11.89,
+    "summaries": [
+      "76 passed, 0 failed, 0 warnings"
+    ]
+  },
+  {
+    "file": "orchestration-client.test.js",
+    "status": 0,
+    "seconds": 0.4,
+    "summaries": [
+      "\u2139 tests 2",
+      "\u2139 pass 2",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "orchestration-e2e.test.js",
+    "status": 0,
+    "seconds": 10.24,
+    "summaries": [
+      "\u2139 tests 1",
+      "\u2139 pass 1",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "platform.test.js",
+    "status": 0,
+    "seconds": 3.98,
+    "summaries": [
+      "110 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "protect-e2e.test.js",
+    "status": 0,
+    "seconds": 2.04,
+    "summaries": [
+      "33 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "protection-units.test.js",
+    "status": 0,
+    "seconds": 1.39,
+    "summaries": [
+      "167 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "qr.test.js",
+    "status": 0,
+    "seconds": 0.15,
+    "summaries": [
+      "39 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "reliability-e2e.test.js",
+    "status": 1,
+    "seconds": 10.25,
+    "summaries": [
+      "\u2139 tests 10",
+      "\u2139 pass 8",
+      "\u2139 fail 2",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "render.test.js",
+    "status": 0,
+    "seconds": 1.92,
+    "summaries": [
+      "12 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "restore-e2e.test.js",
+    "status": 0,
+    "seconds": 4.77,
+    "summaries": [
+      "\u2139 tests 1",
+      "\u2139 pass 1",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "security-audit.test.js",
+    "status": 0,
+    "seconds": 11.94,
+    "summaries": [
+      "\u2139 tests 28",
+      "\u2139 pass 28",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "security-recovery.test.js",
+    "status": 0,
+    "seconds": 4.6,
+    "summaries": [
+      "\u2139 tests 17",
+      "\u2139 pass 17",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "security.test.js",
+    "status": 0,
+    "seconds": 7.75,
+    "summaries": [
+      "52 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "sfl-e2e.test.js",
+    "status": 0,
+    "seconds": 2.81,
+    "summaries": [
+      "39 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "storage-failure.test.js",
+    "status": 0,
+    "seconds": 0.79,
+    "summaries": [
+      "\u2139 tests 10",
+      "\u2139 pass 10",
+      "\u2139 fail 0",
+      "\u2139 skipped 0"
+    ]
+  },
+  {
+    "file": "subdomain.test.js",
+    "status": 0,
+    "seconds": 5.75,
+    "summaries": [
+      "39 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "trust-proxy.test.js",
+    "status": 0,
+    "seconds": 24.33,
+    "summaries": [
+      "4 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "upload-scan.test.js",
+    "status": 0,
+    "seconds": 4.38,
+    "summaries": [
+      "44 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "waf-e2e.test.js",
+    "status": 0,
+    "seconds": 2.73,
+    "summaries": [
+      "37 passed, 0 failed"
+    ]
+  },
+  {
+    "file": "waftools.test.js",
+    "status": 0,
+    "seconds": 16.16,
+    "summaries": [
+      "167 passed, 0 failed"
+    ]
+  }
+]

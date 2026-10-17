@@ -46,6 +46,15 @@ test('Kubernetes transport verifies CA, rotates credentials, bounds lists and re
   assert.equal(k8s.tlsPair(wildSecret,'*.example.test').cert,wild.cert.toString())
   assert.throws(()=>k8s.tlsPair({...secret,data:{...secret.data,'tls.key':pair.key.toString('base64')}},'web.example.test'),/does not match/)
   assert.throws(()=>k8s.tlsPair({...secret,type:'Opaque'},'web.example.test'),/kubernetes.io\/tls/)
+  const mountRoot=path.join(dir,'mounted'), mount=path.join(mountRoot,'web-tls'), generation=path.join(mount,'..generation-one')
+  fs.mkdirSync(generation,{recursive:true});fs.writeFileSync(path.join(generation,'tls.crt'),appPair.cert);fs.writeFileSync(path.join(generation,'tls.key'),appPair.key)
+  fs.symlinkSync('..generation-one',path.join(mount,'..data'),'dir')
+  assert.equal(k8s.tlsPair(k8s.mountedTlsSecret(mountRoot,'web-tls'),'web.example.test').cert,appPair.cert.toString())
+  assert.throws(()=>k8s.mountedTlsSecret(mountRoot,'../web-tls'),/Invalid/)
+  fs.unlinkSync(path.join(mount,'..data'));fs.symlinkSync(dir,path.join(mount,'..data'),'dir')
+  assert.throws(()=>k8s.mountedTlsSecret(mountRoot,'web-tls'),/escaped/)
+  fs.unlinkSync(path.join(mount,'..data'));fs.symlinkSync('..',path.join(mount,'..data'),'dir')
+  assert.throws(()=>k8s.mountedTlsSecret(mountRoot,'web-tls'),/escaped/)
 })
 
 function socketRequest(socketPath, method, url) {

@@ -32,10 +32,18 @@ RUN xcaddy build v2.11.7 --output /usr/bin/caddy \
     --with github.com/corazawaf/coraza-caddy/v2@v2.6.2 \
     --with golang.org/x/net/http2@v0.61.0 \
     --with golang.org/x/crypto/cryptobyte@v0.58.0
+RUN setcap -r /usr/bin/caddy
+
+# Node observes the proxy's writable descriptors without sharing the PID namespace.
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS observer-runtime
 
 # ── Stage 3: final runtime image ─────────────────────────────────────────
 FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && apk add --no-cache libstdc++
+COPY --from=observer-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=observer-runtime /usr/local/LICENSE /usr/local/share/licenses/node/LICENSE
+COPY scripts/caddy-supervisor.js /opt/catwaf/scripts/caddy-supervisor.js
+COPY backend/services/auditWriters.js /opt/catwaf/backend/services/auditWriters.js
 COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
 COPY --from=frontend-build /app/frontend/dist /srv/dashboard
 COPY docker/Caddyfile /etc/caddy/Caddyfile
@@ -61,5 +69,7 @@ RUN caddy list-modules | grep -q http.handlers.waf
 RUN mkdir -p /data/caddy /config/caddy \
     && chown -R 1001:1000 /data /config
 USER 1001:1000
+ENTRYPOINT ["node", "/opt/catwaf/scripts/caddy-supervisor.js"]
+CMD ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD wget -q -O /dev/null http://127.0.0.1:8081/ || exit 1

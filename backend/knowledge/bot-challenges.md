@@ -7,7 +7,7 @@ questions:
   - How does CatWAF check visitor cookies?
   - How do I connect a CrowdSec bouncer?
   - How do I ban or unban an IP?
-related: [orchestration, editions, ip-blacklist]
+related: [orchestration, editions, ip-blocklist]
 actions: []
 ---
 

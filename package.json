@@ -50,7 +50,8 @@
     "test:reliability:load": "node scripts/check-load-reliability.js",
     "test:reliability:filesystem": "bash scripts/check-filesystem-reliability.sh",
     "test:parity": "node --experimental-sqlite --test test/feature-parity.test.js",
-    "test:orchestration": "node --experimental-sqlite --test test/orchestration-e2e.test.js test/orchestration-client.test.js",
+    "test:orchestration": "node --experimental-sqlite --test test/orchestration-e2e.test.js test/orchestration-client.test.js test/audit-writers.test.js",
+    "test:kubernetes": "node --experimental-sqlite scripts/check-kubernetes.js",
     "test:docker-autoconf": "node --experimental-sqlite scripts/check-docker-autoconf.js",
     "test:crowdsec": "node --experimental-sqlite scripts/check-crowdsec.js"
   },

@@ -59,7 +59,7 @@ Two opt-in features deliberately change that, and neither is on unless you turn 
 
 | Feature | What enters the path | If CatWAF is down |
 |---|---|---|
-| Runtime enforcement (client reputation) | A `forward_auth` hop carrying request **headers** | Fails open — every error path answers allow |
+| Runtime enforcement (client reputation) | A `forward_auth` hop carrying request **headers** | Enabled enforcement fails closed when its API is unavailable; individual external services have explicit outage policies |
 | Upload malware scanning | The request **body**, for the nominated upload paths only | Governed by `upload_scan.fail_open`, on by default |
 
 Both hops overwrite `X-Real-IP` / `X-CatWAF-Client-IP` with the real
@@ -72,10 +72,13 @@ Everything else keeps going straight from Caddy to your origin.
 
 What the backend does: serves the dashboard's API, persists WAF configuration, translates that configuration into real Coraza directives written into your Caddyfile, triggers a reload, and ingests Coraza's own audit log so the dashboard can show real traffic.
 
-The current reliability review found request resets during upstream reloads and
-audit-record loss when a slow request outlives multiple log rotations. Reload
-acknowledgement does not prove older requests or audit writers have finished.
-Both remain failing release regressions; see [the current recheck](security-recheck-2026-10-17.md).
+Reload acknowledgement does not prove older requests or audit writers have
+finished. Audit ingestion now follows all retained generations, and deletion
+requires writer retirement plus a successful final drain. Containers use a
+same-UID Node.js supervisor to observe Caddy's writable descriptors through a
+private Unix socket. Unknown writer state retains files. Upstream reload
+connection resets remain a failing release regression; see the
+[current validation](reliability-followup-2026-10-17.md).
 
 ## Backend layout
 

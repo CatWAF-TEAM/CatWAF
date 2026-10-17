@@ -1,8 +1,14 @@
 # Reliability baseline — 2026-10-17
 
-The release remains blocked: 32 of 34 suite files pass, while reload connection resets and audit-record loss during overlapping requests/rotations remain reproducible. The final 15-minute mixed-protocol load fails the strict zero-error gate. GO-2026-5932 remains unsuppressed and blocks both images containing Caddy.
+The release remains blocked by reload connection resets and GO-2026-5932 in
+both images containing Caddy. The audit-lifetime regression is fixed and has
+passed with native Caddy and separate containers on a real Kubernetes cluster.
+The latest complete suite has 35 of 36 files passing; the strict reload gate
+remains enabled and failing.
 
-See [current results](security-recheck-2026-10-17.md) and [the validation record](security-recheck-2026-10-17.json). No equivalence to BunkerWeb reliability or absence of all vulnerabilities is established.
+See [current results](reliability-followup-2026-10-17.md) and the
+[earlier validation record](security-recheck-2026-10-17.json). No equivalence to
+BunkerWeb reliability or absence of all vulnerabilities is established.
 
 ## Reproduce
 

@@ -1,5 +1,8 @@
 # Free feature validation — 2026-10-17
 
+This is the earlier feature snapshot. Later audit and Kubernetes fixes and
+real-cluster results are in the [follow-up validation](reliability-followup-2026-10-17.md).
+
 This extends the [1.0.2 security recheck](security-recheck-2026-10-17.md) with
 bot challenges, manual-ban activation, CrowdSec and orchestration changes.
 **The release gates still fail.** Publishing these changes does not establish

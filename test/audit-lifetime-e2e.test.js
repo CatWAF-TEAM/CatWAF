@@ -1,5 +1,5 @@
 // A reload acknowledgement does not imply that older requests have finished.
-// Keep this strict regression until audit retirement tracks writer lifetime.
+// Preserve late records and prove retired files can eventually be removed.
 const test = require('node:test'), assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), http = require('node:http'), net = require('node:net')
 const { spawn, execFile } = require('node:child_process'), { promisify } = require('node:util'), { once } = require('node:events')
@@ -56,8 +56,12 @@ test('a request finishing after multiple rotations retains its audit record', { 
   await Promise.race([active, request.then(() => { throw new Error('request finished before entering origin') })])
   const rotations = []
   for (let n = 0; n < 3; n++) {
-    const result = audit.maintain({ force: true, env: { CATWAF_AUDIT_MAX_FILES: '1' } })
+    const mask = process.umask(0o077)
+    let result
+    try { result = audit.maintain({ force: true, env: { CATWAF_AUDIT_MAX_FILES: '1' } }) }
+    finally { process.umask(mask) }
     assert.equal(result.ok, true, JSON.stringify(result)); rotations.push(result.pruned)
+    assert.equal(fs.statSync(audit.activePath()).mode & 0o777, 0o660, 'a separate proxy UID must retain group write access despite umask')
     await sleep(1100)
   }
   assert.equal(await request, 500)
@@ -66,4 +70,10 @@ test('a request finishing after multiple rotations retains its audit record', { 
   const rows = db.getDb().prepare('SELECT id FROM request_log WHERE uri=?').all('/late-audit-probe')
   t.diagnostic(JSON.stringify({ rotations, originalLogExists: fs.existsSync(auditPath), matchingAuditRows: rows.length }))
   assert.equal(rows.length, 1, 'the completed request must remain auditable after rotation')
+  const stopped = once(proc, 'exit'); proc.kill('SIGTERM'); await stopped
+  const pruned = audit.prune({ CATWAF_AUDIT_MAX_FILES: '1' })
+  assert.equal(rotations.flat().length + pruned.deleted.length, 2, 'retention must remove both excess archives once writers retire')
+  assert.equal(audit.listFiles(auditPath).length, 2, 'only the active log and one archive remain')
+  assert.equal(pruned.deferred.length, 0)
+  assert.equal(db.getDb().prepare('SELECT COUNT(*) AS n FROM request_log WHERE uri=?').get('/late-audit-probe').n, 1)
 })

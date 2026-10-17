@@ -11,6 +11,9 @@ module. Trivy still reports that module-level advisory in both backend and Caddy
 images. This is evidence about exposure, not removal of the advisory or a waiver
 of the all-findings image gate. Current binary hashes and raw scanner output are
 in the [recheck record](security-recheck-2026-10-17.json).
+The [follow-up run](reliability-followup-2026-10-17.md) rebuilt the same upstream
+binary (identical SHA-256) and reconfirmed these results. The all-findings gate
+still rejects both images; no new fixed upstream version was found.
 
 The [Go vulnerability database](https://pkg.go.dev/vuln/GO-2026-5932) marks the
 unmaintained `golang.org/x/crypto/openpgp` family unsafe by design, across all

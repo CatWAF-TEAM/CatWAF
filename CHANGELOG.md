@@ -13,9 +13,23 @@ rewritten, only re-filed.
 database rollback, backup restore, authentication, API contracts, audit rotation,
 and the Node.js control plane without adding Go application code. The
 [security recheck](docs/security-recheck-2026-10-17.md) records the test evidence.
-Release validation remains blocked by reload connection resets, an audit record
-lost across rotations, and an unsuppressed upstream Go module advisory. These
+Release validation remains blocked by reload connection resets and an
+unsuppressed upstream Go module advisory. These
 checks remain enabled; this update is not a clean release-gate result.
+
+## Audit and Kubernetes fixes — 2026-10-17
+
+- Follow late audit writes across log generations with persistent inode-bound
+  cursors. Prune only after proving writer retirement and successful ingestion.
+- Add a private Node.js writer observer to the Caddy image; preserve separate
+  backend/proxy users and avoid PID namespace sharing or added capabilities.
+- Preserve shared audit-file permissions under restrictive umasks, and treat
+  unreadable files as failures rather than successful drains.
+- Remove Kubernetes Secret API permission. Read explicitly mounted TLS Secrets
+  from one kubelet generation; restrict the projected API token to the backend.
+- Remove inherited Caddy file capabilities so hardened Kubernetes Pods can start.
+- Add a real kind cluster integration check and CI job. See the
+  [follow-up validation](docs/reliability-followup-2026-10-17.md).
 
 ## Free integrations update — 2026-10-17
 

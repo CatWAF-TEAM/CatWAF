@@ -114,9 +114,21 @@ The controller implements `networking.k8s.io/v1` Ingress with:
 - Paginated, authenticated API reads with CA validation, token rereading,
   deadlines, body limits, and removal of routes after successful deletion reads.
 
-Secret RBAC grants `get`, never `list` or `watch`, restricted to `app-tls` by
-default. Extend the Role's `resourceNames` only for your TLS Secret names. Use a dedicated namespace containing
-only trusted applications. The controller cannot mutate Kubernetes resources.
+The manifest grants **no Secret API permissions**. It explicitly mounts `app-tls`
+read-only at `/run/catwaf-tls/app-tls`, visible only to the backend. For each
+additional TLS Secret, add a named Secret volume and a backend-only mount at
+`/run/catwaf-tls/<secret-name>`. Keep `CATWAF_K8S_TLS_DIR=/run/catwaf-tls` and do
+not use `subPath` for these mounts: kubelet must be able to rotate them. Each
+reconcile reads the certificate and key from the same atomic `..data` generation.
+Allow for kubelet projection delay plus the controller polling interval.
+
+The API token has a requested 600-second lifetime and is projected with mode
+0440 at `/run/catwaf-kubernetes`, only in the backend. Automatic token mounting
+is disabled on both the Pod and ServiceAccount. The controller rereads the token
+for each request. Host/custom deployments without `CATWAF_K8S_TLS_DIR` retain the
+older explicit Secret-GET mode; that mode requires separately granted RBAC.
+Use a dedicated namespace containing only trusted applications. The controller
+cannot mutate Kubernetes resources.
 It does not update Ingress status or request certificates from cert-manager.
 Use cert-manager or another issuer to populate the referenced Secrets.
 
@@ -150,7 +162,17 @@ Kubernetes conformance, production-cluster validation, live provider-account
 verification or BunkerWeb reliability equivalence. See
 [feature validation](feature-validation-2026-10-17.md),
 [feature coverage](bunkerweb-feature-coverage.md) and the existing
-[release blockers](security-recheck-2026-10-17.md).
+[latest validation and release blockers](reliability-followup-2026-10-17.md).
+
+For the real Kubernetes test, create an empty disposable kind cluster named
+`catwaf-<test-name>` with a separate kubeconfig, build and load both images, then
+run `npm run test:kubernetes` with `CATWAF_K8S_TEST_KUBECONFIG`,
+`CATWAF_K8S_BACKEND_IMAGE` and `CATWAF_K8S_CADDY_IMAGE` set. `KUBECTL` can select
+the kubectl binary. The test refuses an unrelated context or existing fixture
+objects. It exercises routing, real RBAC denials, certificate rotation, audit
+rotation, controller outages, application rollout and persistent Pod recreation.
+It removes its namespace and cluster-scoped fixture objects by default. Delete
+the disposable cluster afterward. The CI workflow includes this check.
 
 For the real Docker lifecycle check, build `docker/Metadata.Dockerfile` as
 `catwaf-metadata:test`, then run `npm run test:docker-autoconf` on a local Linux

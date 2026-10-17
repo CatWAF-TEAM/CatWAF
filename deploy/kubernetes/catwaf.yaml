@@ -23,12 +23,7 @@ rules:
   - apiGroups: ['']
     resources: [services]
     verbs: [get, list]
-  # No Secret list/watch access. Extend this allowlist only for TLS Secrets
-  # explicitly referenced by your Ingress objects.
-  - apiGroups: ['']
-    resources: [secrets]
-    resourceNames: [app-tls]
-    verbs: [get]
+  # TLS Secrets are explicit read-only volumes, never readable through this role.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -191,7 +186,11 @@ spec:
             - {name: CATWAF_INTERNAL_HOST, value: 127.0.0.1}
             - {name: CADDYFILE_PATH, value: /etc/caddy/Caddyfile}
             - {name: CADDY_ADMIN_SOCKET, value: /run/catwaf-admin/admin.sock}
+            - {name: CATWAF_AUDIT_WRITER_SOCKET, value: /run/catwaf-admin/audit-writers.sock}
             - {name: CORAZA_AUDIT_LOG, value: /var/log/coraza/audit.json}
+            - {name: CATWAF_K8S_TOKEN_FILE, value: /run/catwaf-kubernetes/token}
+            - {name: CATWAF_K8S_CA_FILE, value: /run/catwaf-kubernetes/ca.crt}
+            - {name: CATWAF_K8S_TLS_DIR, value: /run/catwaf-tls}
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef: {name: catwaf-secrets, key: JWT_SECRET}
@@ -208,7 +207,8 @@ spec:
             - {name: state, mountPath: /etc/caddy, subPath: config}
             - {name: state, mountPath: /var/log/coraza, subPath: logs}
             - {name: admin, mountPath: /run/catwaf-admin, readOnly: true}
-            - {name: api-token, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true}
+            - {name: api-token, mountPath: /run/catwaf-kubernetes, readOnly: true}
+            - {name: app-tls, mountPath: /run/catwaf-tls/app-tls, readOnly: true}
             - {name: backend-tmp, mountPath: /tmp}
         - name: caddy
           image: catwaf-caddy:1.0.2
@@ -253,12 +253,17 @@ spec:
           emptyDir: {sizeLimit: 256Mi}
         - name: api-token
           projected:
-            defaultMode: 0444
+            defaultMode: 0440
             sources:
-              - serviceAccountToken: {path: token, expirationSeconds: 3600}
+              - serviceAccountToken: {path: token, expirationSeconds: 600}
               - configMap:
                   name: kube-root-ca.crt
                   items: [{key: ca.crt, path: ca.crt}]
+        - name: app-tls
+          secret:
+            secretName: app-tls
+            optional: true
+            defaultMode: 0440
 ---
 apiVersion: v1
 kind: Service

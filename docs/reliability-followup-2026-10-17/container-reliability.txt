@@ -1,0 +1,1 @@
+{"project":"catwaf-reliability-52446672b07b","checks":["named TLS and runtime volumes","real Unix admin health","no pending recovery","allowed traffic and SQLi blocking","API outage independence","container recreation","identical TLS certificate after recreation","blocking after recreation"],"passed":8}

@@ -1,0 +1,37 @@
+
+> catwaf-dashboard@1.0.2 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2827 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              1.18 kB │ gzip:   0.52 kB
+dist/assets/index-C2AM45Se.css              51.22 kB │ gzip:  10.54 kB
+dist/assets/rotate-ccw-ro5aDOXX.js           0.37 kB │ gzip:   0.29 kB
+dist/assets/circle-x-DsacLbGX.js             0.37 kB │ gzip:   0.28 kB
+dist/assets/eye-D6L1NzYx.js                  0.42 kB │ gzip:   0.30 kB
+dist/assets/trash-2-D1azV310.js              0.80 kB │ gzip:   0.39 kB
+dist/assets/DashboardCharts-DWJLAEfb.js      1.99 kB │ gzip:   0.84 kB
+dist/assets/OrchestrationPage-CFtuFKva.js    4.00 kB │ gzip:   1.62 kB
+dist/assets/LogsPage-DfUOwdvv.js             4.40 kB │ gzip:   1.74 kB
+dist/assets/RulesPage-BsHw0Ggy.js            4.54 kB │ gzip:   1.80 kB
+dist/assets/SecurityScorePage-Df6tK5kg.js    5.92 kB │ gzip:   2.29 kB
+dist/assets/Paranoia-B64fSPm_.js             6.96 kB │ gzip:   2.70 kB
+dist/assets/Threats-DjCFPw1p.js              7.99 kB │ gzip:   2.69 kB
+dist/assets/OpsPages-WqM3KlfZ.js             8.11 kB │ gzip:   2.79 kB
+dist/assets/Pages-B9A63dMp.js               11.00 kB │ gzip:   4.06 kB
+dist/assets/ConfigPages-Che5Fwio.js         11.10 kB │ gzip:   4.12 kB
+dist/assets/pageKit-DLnfO1XJ.js             14.29 kB │ gzip:   4.81 kB
+dist/assets/V2Pages-BcxvOhMM.js             14.56 kB │ gzip:   4.33 kB
+dist/assets/SensitiveFiles-DMcxtz4w.js      15.84 kB │ gzip:   4.69 kB
+dist/assets/AttackMap-Nmxc4IK4.js           19.81 kB │ gzip:   7.13 kB
+dist/assets/ProtectionPages-Dv962NY4.js     24.37 kB │ gzip:   6.70 kB
+dist/assets/OpsExtraPages-7aOXZ3bj.js       31.65 kB │ gzip:   9.21 kB
+dist/assets/index-DVScXFJc.js              118.23 kB │ gzip:  32.50 kB
+dist/assets/three-react-BAo8y-RG.js        153.24 kB │ gzip:  49.59 kB
+dist/assets/react-vendor-Aeb7qvej.js       180.24 kB │ gzip:  59.33 kB
+dist/assets/charts-Ckad-RQq.js             414.33 kB │ gzip: 111.91 kB
+dist/assets/three-core-EXBWbo5i.js         683.21 kB │ gzip: 175.18 kB
+✓ built in 7.03s

@@ -31,6 +31,7 @@ services:
       CATWAF_INTERNAL_HOST: backend
       CADDYFILE_PATH: /etc/caddy/Caddyfile
       CADDY_ADMIN_SOCKET: /run/catwaf-admin/admin.sock
+      CATWAF_AUDIT_WRITER_SOCKET: /run/catwaf-admin/audit-writers.sock
       CORAZA_AUDIT_LOG: /var/log/coraza/audit.json
     ports:
       # Loopback only. The dashboard reaches the API through Caddy on :80

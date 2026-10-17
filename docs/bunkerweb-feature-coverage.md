@@ -29,7 +29,8 @@ additional upstream modules; settings alone do not establish working parity.
 The renderer reports unsupported settings. Do not enable them based solely on
 this inventory.
 
-The current strict release checks still expose reload connection resets,
-audit-record loss across rotations and an unsuppressed upstream advisory. The
-new feature tests do not waive those checks. See [feature validation](feature-validation-2026-10-17.md),
+The current strict release checks still expose reload connection resets and an
+unsuppressed upstream advisory. Audit lifetime is fixed and the Kubernetes
+deployment has passed the documented real-cluster checks. See
+[current validation](reliability-followup-2026-10-17.md),
 [setup](orchestration.md) and [protection configuration](protection.md).

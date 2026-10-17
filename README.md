@@ -22,10 +22,10 @@ CatWAF sits in front of your website and inspects every request through Coraza â
 
 **Security patchset status:** the CatWAF application remains Node.js, with no added
 Go source or custom proxy runtime patches. Release validation is still blocked by
-reload connection resets, audit-record loss during overlapping requests and log
-rotations, and one unsuppressed dependency-module advisory. See the
-[security recheck](docs/security-recheck-2026-10-17.md) and
-[feature validation](docs/feature-validation-2026-10-17.md) for measured results.
+reload connection resets and one unsuppressed dependency-module advisory.
+Audit writer lifetime and Kubernetes deployment fixes are recorded in the
+[latest validation](docs/reliability-followup-2026-10-17.md), including real-cluster
+testing and the remaining failed gates.
 
 ### What stops the bad guys
 

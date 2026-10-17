@@ -1,0 +1,51 @@
+▶ WAF availability through reloads and dependency failures
+  ✔ the real permissioned Unix admin endpoint answers (46.802903ms)
+  ✔ reload falls back to the Unix HTTP API when the CLI is unavailable (49.55088ms)
+  ✔ configured JSON content is allowed and MIME substrings are rejected (11.220097ms)
+  ✖ concurrent valid and invalid reloads never bypass or drop sampled requests (2001.641082ms)
+  ✔ an origin outage cannot bypass Coraza, and origin restart recovers (15.879406ms)
+  ✔ opt-in enforcement denies are not retried or bypassed (53.932128ms)
+  ✔ a wedged enforcement API fails within the transport deadline (5011.871601ms)
+  ✔ stopping the API fails closed only while enforcement is enabled (134.950267ms)
+  ✔ Caddy restart retains blocking configuration (671.52777ms)
+✖ WAF availability through reloads and dependency failures (10185.681852ms)
+ℹ {"sampledRequests":1246,"concurrency":4,"validReloads":21,"rejectedReloads":20,"failedPairs":6,"pairLatencyP95Ms":13}
+ℹ stalled enforcement response: 5004ms
+ℹ tests 10
+ℹ suites 0
+ℹ pass 8
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10188.9146
+
+✖ failing tests:
+
+test at test/reliability-e2e.test.js:119:11
+✖ concurrent valid and invalid reloads never bypass or drop sampled requests (2001.641082ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'socket hang up (http://127.0.0.1:39283/?id=1%20UNION%20SELECT%201,2,3--)',
+  +   'socket hang up (http://127.0.0.1:39283)',
+  +   'socket hang up (http://127.0.0.1:39283/?id=1%20UNION%20SELECT%201,2,3--)',
+  +   'socket hang up (http://127.0.0.1:39283/?id=1%20UNION%20SELECT%201,2,3--)',
+  +   'connect ECONNRESET 127.0.0.1:39283 (http://127.0.0.1:39283)',
+  +   'socket hang up (http://127.0.0.1:39283)'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (/mnt/c/Users/юьъг/Documents/Codex/2026-10-16/i-x20/outputs/CatWAF/test/reliability-e2e.test.js:143:12)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async TestContext.<anonymous> (/mnt/c/Users/юьъг/Documents/Codex/2026-10-16/i-x20/outputs/CatWAF/test/reliability-e2e.test.js:119:3)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Array],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

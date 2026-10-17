@@ -1,0 +1,12 @@
+✔ writer inventory identifies a live writable descriptor and observes its close (2.123289ms)
+✔ retention defers on missing proof, live writers, incomplete records and database failure (11.130002ms)
+✔ late archive appends and active-file appends have independent restart-safe cursors (6.042636ms)
+✔ an inaccessible archive is a drain failure, never a missing-file success (0.635271ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.252397
