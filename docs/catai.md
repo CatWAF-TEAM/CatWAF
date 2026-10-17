@@ -205,3 +205,11 @@ node --experimental-sqlite test/catai.test.js
 ```
 
 This covers knowledge-base integrity, retrieval accuracy across 49 questions, the no-match threshold, action extraction, direction policy, the self-lockout guard, apply/undo round-trips, the concurrency gate, and graceful degradation when Ollama is unreachable.
+
+## Free integrations knowledge
+
+CatAI now has local reference topics for Docker autoconfiguration, Kubernetes
+ingress, multisite capacity, bot challenges, provider CAPTCHA and CrowdSec. These
+are explanatory topics; they do not add deployment tools or broaden CatAI action
+permissions. Enter integration secrets only in their settings fields. The topics
+also state the live-testing limits and existing release blockers.

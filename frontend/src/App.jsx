@@ -48,6 +48,7 @@ const ReportsPage         = lazy(() => import('./pages/OpsExtraPages.jsx').then(
 const TwoFactorPage       = lazy(() => import('./pages/OpsExtraPages.jsx').then(m => ({ default: m.TwoFactorPage })))
 const BackupsPage         = lazy(() => import('./pages/OpsExtraPages.jsx').then(m => ({ default: m.BackupsPage })))
 const TelemetryPage       = lazy(() => import('./pages/OpsExtraPages.jsx').then(m => ({ default: m.TelemetryPage })))
+const OrchestrationPage   = lazy(() => import('./pages/OrchestrationPage.jsx'))
 
 const THEME_OPTIONS = [
   { id: 'dark',     label: 'Dark',       desc: 'Blue-accented dark theme',            preview: ['#0d0f14','#13161d','#4f8ef7'] },
@@ -323,6 +324,7 @@ export default function App() {
             <Route path="/config/advanced" element={<AdvancedConfigPage />} />
 
             <Route path="/system/jobs"      element={<JobsPage />} />
+            <Route path="/system/orchestration" element={<OrchestrationPage />} />
             <Route path="/system/caches"    element={<CachesPage />} />
             <Route path="/system/templates" element={<TemplatesPage />} />
             <Route path="/system/reports"   element={<ReportsPage />} />

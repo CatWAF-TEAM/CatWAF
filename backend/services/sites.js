@@ -1,14 +1,5 @@
-// sites.js — the registry of hostnames CatWAF considers "ours" (idea #65).
-//
-// CatWAF Free is deliberately single-site (see the editions knowledge doc:
-// one site, one admin, no fleet management). That is an edition boundary,
-// not an oversight — but several features now need to answer "which hosts
-// are legitimate?" (reject-unknown-Host, the catch-all block, security.txt's
-// canonical URL, redirect rules). Answering that from a registry rather than
-// from a scattered set of env reads is what keeps the boundary a conscious
-// decision: `capacity()` is the one place the limit lives, and the features
-// that grew around it (templates, discovery, the proxy generator) stay
-// single-site-safe because they all ask here.
+// Host registry shared by manually configured sites and managed routes.
+// Both Free editions can raise their explicit site capacity.
 
 const settings = require('./settings')
 const edition = require('./edition')
@@ -41,6 +32,7 @@ function knownHosts() {
     site.primary_host,
     ...site.aliases,
     ...fromEnvironment(),
+    ...require('./managedRoutes').allRoutes().map(r => r.host),
   ].map(normalizeHost).filter(Boolean)
   return [...new Set(hosts)]
 }
@@ -51,12 +43,10 @@ function primaryHost() {
   return knownHosts()[0] || null
 }
 
-// The edition limit, in one place. Free returns 1; the schema caps the
-// setting at 1 too, so raising it is a deliberate two-file change rather
-// than something that can drift in accidentally.
+// Explicit operator-configured resource budget.
 function capacity() {
   const configured = settings.get('sites').max_sites
-  return { max: edition.isFull() ? configured : 1, edition: edition.current() }
+  return { max: configured, edition: edition.current() }
 }
 
 function canAddSite(currentCount) {
@@ -65,7 +55,7 @@ function canAddSite(currentCount) {
   return {
     ok: false,
     code: 'SITE_LIMIT',
-    message: `CatWAF Free protects one site. Fleet management across multiple independent sites is not part of this edition — see the editions documentation. Aliases of the same site can be added under Protected sites.`,
+    message: 'The configured site capacity has been reached. Increase Maximum protected sites before adding another site.',
   }
 }
 

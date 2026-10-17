@@ -173,9 +173,20 @@ function registerAll() {
     label: 'Docker label scan',
     description: 'Re-reads container labels and applies the configuration they declare.',
     intervalSec: () => settings.get('autoconf').interval_sec,
-    reloadAfter: true,
+    runOnStart: true,
+    reloadAfter: false,
     isEnabled: () => settings.get('autoconf').enabled,
     fn: () => require('./autoconf').scan(),
+  })
+
+  jobs.register('kubernetes.reconcile', {
+    label: 'Kubernetes ingress reconciliation',
+    description: 'Reconciles selected Ingress resources, services and TLS secrets.',
+    intervalSec: () => settings.get('kubernetes').interval_sec,
+    runOnStart: true,
+    reloadAfter: false,
+    isEnabled: () => settings.get('kubernetes').enabled,
+    fn: () => require('./kubernetes').scan(),
   })
 
   // ── Housekeeping ──

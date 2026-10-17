@@ -1,16 +1,6 @@
-// challenge/index.js — the challenge gate (ideas #1, #2, #3, #4).
-//
-// CatWAF's only two answers today are 200 and 403. A challenge is the useful
-// tier between them: a visitor who looks suspicious but is not clearly
-// hostile gets asked to prove it is a browser, which stops essentially all
-// low-effort scripted traffic — scanners, scrapers, credential stuffing —
-// without touching anomaly scoring or adding any false-positive risk for a
-// real browser.
-//
-// The proof is a signed, short-lived cookie. Signing reuses the HMAC
-// derivation in services/secrets.js rather than introducing a second key
-// scheme, so a solved challenge cannot be forged and cannot outlive its
-// window.
+// Challenge gate: cookie round trips, work puzzles, image CAPTCHA and
+// provider verification, remembered in short-lived signed cookies. These
+// controls add friction for bots; none guarantees that a visitor is human.
 
 const crypto = require('crypto')
 
@@ -48,13 +38,17 @@ function sweep() {
 
 // ─── Token minting and verification ─────────────────────────────────────
 
+function policyFor(cfg) {
+  return JSON.stringify([cfg.mode, cfg.provider, cfg.site_key, cfg.secret_key, cfg.provider_verify_url, cfg.provider_hostnames])
+}
+
 function bindingFor(ip, userAgent) {
   const cfg = settings.get('challenge')
   // The token is bound to the address it was issued to when a session-level
   // binding is configured; otherwise a solved token could simply be handed
   // around between bots.
   return crypto.createHash('sha256')
-    .update(`${normalizeClientIp(ip || '')}|${cfg.mode === 'off' ? '' : String(userAgent || '').slice(0, 200)}`)
+    .update(JSON.stringify([normalizeClientIp(ip || ''), String(userAgent || '').slice(0, 200), policyFor(cfg)]))
     .digest('hex').slice(0, 16)
 }
 
@@ -86,7 +80,7 @@ function verifyToken(token, { ip, userAgent }) {
 }
 
 function parseCookies(header) {
-  const out = {}
+  const out = Object.create(null)
   for (const part of String(header || '').split(';')) {
     const idx = part.indexOf('=')
     if (idx === -1) continue
@@ -190,6 +184,7 @@ function issue({ ip, userAgent, returnTo, error = null }) {
     ip: normalizeClientIp(ip || ''),
     userAgent: String(userAgent || '').slice(0, 200),
     mode: cfg.mode,
+    policy: policyFor(cfg),
     expires: Date.now() + Math.max(10, cfg.resolve_seconds) * 1000,
     answer: null,
   }
@@ -206,6 +201,7 @@ function issue({ ip, userAgent, returnTo, error = null }) {
     mode: cfg.mode,
     provider: cfg.provider,
     siteKey: cfg.site_key,
+    providerUrl: cfg.provider_verify_url,
     token: '',
     returnTo: safeReturnTo(returnTo),
     error,
@@ -268,11 +264,16 @@ function recordAttempt(ip) {
 
 function clearAttempts(ip) { attempts.delete(normalizeClientIp(ip || '')) }
 
-async function solve({ id, ip, userAgent, answer, proof, providerToken }) {
+async function solve({ id, ip, userAgent, answer, proof, providerToken, cookieId, hostname }) {
   sweep()
   const cfg = settings.get('challenge')
   const entry = pending.get(id)
   if (!entry) return { ok: false, error: 'This challenge has expired. Please try again.' }
+  if (entry.solving) return { ok: false, error: 'Verification is already in progress.' }
+  if (entry.userAgent !== String(userAgent || '').slice(0, 200) ||
+      entry.policy !== policyFor(cfg)) {
+    return { ok: false, error: 'The client or challenge settings changed. Please try again.' }
+  }
   if (entry.expires <= Date.now()) { pending.delete(id); return { ok: false, error: 'This challenge has expired. Please try again.' } }
   if (entry.ip && entry.ip !== normalizeClientIp(ip || '')) {
     return { ok: false, error: 'This challenge was issued to a different connection.' }
@@ -288,7 +289,8 @@ async function solve({ id, ip, userAgent, answer, proof, providerToken }) {
   let detail = null
 
   if (entry.mode === 'cookie') {
-    solved = true
+    solved = typeof cookieId === 'string' && cookieId === id
+    if (!solved) detail = 'Enable cookies in your browser and try again.'
   } else if (entry.mode === 'javascript') {
     solved = verifyProof(id, proof)
     if (!solved) detail = 'The browser check did not complete.'
@@ -296,12 +298,19 @@ async function solve({ id, ip, userAgent, answer, proof, providerToken }) {
     solved = captcha.matches(entry.answer, answer)
     if (!solved) detail = 'Those characters did not match. Please try again.'
   } else if (entry.mode === 'provider') {
-    const result = await providers.verify(cfg.provider, providerToken, cfg, ip)
+    entry.solving = true
+    let result
+    try { result = await providers.verify(cfg.provider, providerToken, cfg, ip, hostname) }
+    finally { entry.solving = false }
     solved = result.ok
     if (!solved) detail = result.error
   }
 
-  if (!solved) return { ok: false, error: detail || 'Verification failed.', attemptsLeft: Math.max(0, cfg.max_attempts - count) }
+  if (!solved) {
+    if (count >= cfg.max_attempts) pending.delete(id)
+    return { ok: false, banned: count >= cfg.max_attempts, error: detail || 'Verification failed.', attemptsLeft: Math.max(0, cfg.max_attempts - count) }
+  }
+  if (pending.get(id) !== entry || entry.expires <= Date.now() || entry.policy !== policyFor(settings.get('challenge'))) return { ok: false, error: 'This challenge expired during verification.' }
 
   pending.delete(id)
   clearAttempts(ip)
@@ -313,8 +322,8 @@ async function solve({ id, ip, userAgent, answer, proof, providerToken }) {
 }
 
 // Mirrors the client-side loop in challenge/page.js: find n such that
-// djb2(id + n) % 4096 === 0. Cheap to check, non-trivial to produce, and
-// impossible for a client that does not execute JavaScript.
+// djb2(id + n) % 4096 === 0. This adds work to basic scripted clients;
+// it does not prove a human is present or prevent non-JavaScript solvers.
 function verifyProof(id, proof) {
   const n = Number(proof)
   if (!Number.isInteger(n) || n < 0 || n > 5_000_000) return false
@@ -334,6 +343,10 @@ function cookieHeader(token, maxAge, { secure = true } = {}) {
   ]
   if (secure) parts.push('Secure')
   return parts.join('; ')
+}
+
+function pendingCookieHeader(id, maxAge, { secure = true } = {}) {
+  return `${PENDING_COOKIE}=${encodeURIComponent(id)}; Path=/catwaf-challenge; Max-Age=${Math.max(0, Math.trunc(maxAge))}; HttpOnly; SameSite=Strict${secure ? '; Secure' : ''}`
 }
 
 function status() {
@@ -356,6 +369,6 @@ function reset() { pending.clear(); attempts.clear() }
 module.exports = {
   COOKIE_NAME, PENDING_COOKIE,
   isVerified, shouldChallenge, isExempt, issue, solve, status, reset,
-  mintToken, verifyToken, cookieHeader, clientIp, parseCookies, safeReturnTo,
+  mintToken, verifyToken, cookieHeader, pendingCookieHeader, clientIp, parseCookies, safeReturnTo,
   recordAttempt, clearAttempts, verifyProof,
 }

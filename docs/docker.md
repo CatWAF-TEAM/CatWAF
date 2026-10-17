@@ -239,3 +239,10 @@ of Caddy's `/data` and `/config` contents to UID 1001 / GID 1000. Shared
 configuration, audit-log and admin-socket directories need group 1000 and the
 documented setgid permissions. Do not change the database ownership or make it
 group-readable. Image rebuilds do not repair existing volume ownership.
+
+## Label autoconfiguration
+
+Use the optional [metadata bridge override](../compose.autoconf.yml) and the
+[Docker controller guide](orchestration.md#docker) to publish labelled application
+routes automatically. The backend receives a restricted metadata socket, never
+the engine socket. Kubernetes deployment is documented in the same guide.

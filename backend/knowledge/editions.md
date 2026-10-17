@@ -14,7 +14,7 @@ actions: []
 
 CatWAF installs in one of two editions. The choice is made at install time, stored in `.env` as `CATWAF_EDITION`, and enforced when commands run — it is a real property of the installation, not a label.
 
-**The WAF is identical in both.** Same Caddy, same Coraza engine, same OWASP Core Rule Set, same paranoia levels, same rules, same blocking behaviour. A site behind Lite is protected exactly as well as a site behind Full. The edition decides what runs *around* the WAF, never how requests are filtered.
+**The core WAF is identical in both:** Caddy, Coraza, OWASP CRS, paranoia levels and static rules. Runtime integrations such as challenges, CrowdSec, temporary ban enforcement and discovery controllers require the Node backend, supplied by Full. Both belong to CatWAF Free.
 
 ## CatWAF Lite
 
@@ -50,7 +50,7 @@ catwaf setup --lite     # Full → Lite
 
 Going to Full installs the frontend dependencies, builds the dashboard and enables the API service. Going to Lite removes the API service rather than leaving it to fail on every boot.
 
-Either direction is safe to re-run, and both preserve your WAF configuration, the event database, your rules, domain settings and admin accounts. Nothing about your protection changes.
+Either direction is safe to re-run, and both preserve your WAF configuration, the event database, your rules, domain settings and admin accounts. Before switching to Lite, disable features that depend on the Node backend; otherwise the configured enforcement hop will refuse requests when the backend stops.
 
 ## Full-only commands on Lite
 

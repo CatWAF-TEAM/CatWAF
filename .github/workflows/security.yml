@@ -56,6 +56,11 @@ jobs:
           export PLAYWRIGHT_CORE="$RUNNER_TEMP/browser-tests/node_modules/playwright-core"
           node test/frontend-smoke.test.js
           node test/auth-flow.test.js
+      - name: Docker autoconfiguration with a restricted metadata bridge
+        if: ${{ !cancelled() }}
+        run: |
+          docker build -f docker/Metadata.Dockerfile -t catwaf-metadata:test .
+          sudo env PATH="$PATH" node --experimental-sqlite scripts/check-docker-autoconf.js
       - name: Build container stack
         run: |
           cp .env.example .env
@@ -82,6 +87,7 @@ jobs:
             ./trivy image --scanners vuln --format json --output "$service.json" "catwaf-security-check-$service"
             node "$GITHUB_WORKSPACE/scripts/check-image-findings.js" "$service.json"
           done
+          ./trivy image --scanners vuln --exit-code 1 catwaf-metadata:test
           cd "$GITHUB_WORKSPACE"
           bash scripts/check-discovery-fixtures.sh
           for image in booknook-apache booknook-php fake-web-php catwaf-fixture-nginx catwaf-fixture-database; do

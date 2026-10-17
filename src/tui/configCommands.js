@@ -254,7 +254,7 @@ async function cmdBans(positional, flags) {
     if (!target) return fail('Which address? `catwaf bans add 203.0.113.7 --minutes 60`')
     const seconds = flags.minutes === undefined ? null : Math.max(1, Math.round(Number(flags.minutes) * 60))
     if (seconds !== null && !Number.isFinite(seconds)) return fail('--minutes must be a number.')
-    const result = bans.ban({
+    const result = bans.addManual({
       target,
       source: 'manual',
       seconds,

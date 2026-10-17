@@ -62,17 +62,23 @@ function list() {
 // Content-Security-Policy needs to allow the provider's script and frame for
 // the challenge page specifically. Returned here so the page builder and any
 // header policy stay in agreement about which origins are involved.
-function cspSources(name) {
+function cspSources(name, cfg = {}) {
   const origins = {
     recaptcha: ['https://www.google.com', 'https://www.gstatic.com'],
-    hcaptcha: ['https://js.hcaptcha.com', 'https://newassets.hcaptcha.com'],
+    hcaptcha: ['https://hcaptcha.com', 'https://*.hcaptcha.com'],
     turnstile: ['https://challenges.cloudflare.com'],
     mcaptcha: [],
+  }
+  if (name === 'mcaptcha' && cfg.provider_verify_url) {
+    try {
+      const url = new URL(cfg.provider_verify_url)
+      if (['https:', 'http:'].includes(url.protocol)) return [url.origin]
+    } catch {}
   }
   return origins[name] || []
 }
 
-async function verify(name, token, cfg, remoteIp) {
+async function verify(name, token, cfg, remoteIp, hostname) {
   const provider = get(name)
   if (!provider) return { ok: false, error: `Unknown challenge provider "${name}"` }
   if (!cfg.secret_key) return { ok: false, error: 'No provider secret key is configured.' }
@@ -88,15 +94,28 @@ async function verify(name, token, cfg, remoteIp) {
     const { response } = await netGuard.guardedFetch(url, {
       method: 'POST',
       timeoutMs: 8000,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      headers: { 'Content-Type': name === 'mcaptcha' ? 'application/json' : 'application/x-www-form-urlencoded' },
+      body: name === 'mcaptcha' ? JSON.stringify({ token, key: cfg.site_key, secret: cfg.secret_key }) : body.toString(),
       // mCaptcha is self-hosted by design — its verify URL points at the
       // operator's own instance, which is usually on this host.
       allowLoopback: name === 'mcaptcha',
     })
+    if (!response.ok) return { ok: false, error: 'The challenge provider is unavailable.' }
     const data = await response.json().catch(() => null)
     if (!data) return { ok: false, error: 'The provider returned an unreadable response.' }
-    if (data.success === true) return { ok: true, score: typeof data.score === 'number' ? data.score : null }
+    if (name === 'mcaptcha') return { ok: data.valid === true, error: data.valid === true ? null : 'Verification rejected.' }
+    if (data.success === true) {
+      const expected = cfg.provider_hostnames?.length ? cfg.provider_hostnames : [hostname].filter(Boolean)
+      const actual = String(data.hostname || '').toLowerCase().replace(/\.$/, '')
+      if (!expected.length || !expected.some(h => String(h).toLowerCase().replace(/\.$/, '') === actual)) {
+        return { ok: false, error: 'The challenge was issued for a different hostname.' }
+      }
+      const issued = Date.parse(data.challenge_ts)
+      if (!Number.isFinite(issued) || issued > Date.now() + 30000 || issued < Date.now() - 300000) {
+        return { ok: false, error: 'The provider challenge has expired.' }
+      }
+      return { ok: true, score: typeof data.score === 'number' ? data.score : null }
+    }
     return { ok: false, error: `Verification rejected${Array.isArray(data['error-codes']) ? `: ${data['error-codes'].join(', ')}` : ''}` }
   } catch (e) {
     return { ok: false, error: `Could not reach the challenge provider: ${e.message}` }

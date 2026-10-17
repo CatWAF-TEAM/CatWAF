@@ -2057,12 +2057,40 @@ paths:
                     type: boolean
                   dryRun:
                     type: boolean
-                  applied:
+                  routes:
                     type: array
                     items:
                       type: object
-                      additionalProperties: true
-                      description: Applied discovery rule.
+                      required:
+                        - id
+                        - host
+                        - path
+                        - pathType
+                        - upstream
+                        - tls
+                      properties:
+                        id:
+                          type: string
+                        host:
+                          type: string
+                        path:
+                          type: string
+                        pathType:
+                          type: string
+                          enum:
+                            - Exact
+                            - Prefix
+                        upstream:
+                          type: string
+                        tls:
+                          type: string
+                          enum:
+                            - 'off'
+                            - auto
+                            - secret
+                        policy:
+                          type: object
+                          additionalProperties: true
         '400':
           description: Invalid input or refused operation
           content:
@@ -4748,8 +4776,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -4772,6 +4800,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Enforcement failed; request refused.
           content:
             application/json:
               schema:
@@ -4807,8 +4841,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -4831,6 +4865,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Enforcement failed; request refused.
           content:
             application/json:
               schema:
@@ -4866,8 +4906,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -4890,6 +4930,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Enforcement failed; request refused.
           content:
             application/json:
               schema:
@@ -4925,8 +4971,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -4949,6 +4995,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Enforcement failed; request refused.
           content:
             application/json:
               schema:
@@ -4986,6 +5038,12 @@ paths:
       responses:
         '204':
           description: CORS preflight response.
+        '503':
+          description: Enforcement failed; request refused.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       x-catwaf-express-all: true
       operationId: options_api_enforce
       x-catwaf-source: backend/routes/gateway.js
@@ -4997,8 +5055,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -5010,6 +5068,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+        '503':
+          description: Enforcement failed; request refused.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         default:
           description: Blocked using the configured status, or socket closed in silent mode.
       parameters:
@@ -5037,8 +5101,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -5061,6 +5125,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Enforcement failed; request refused.
           content:
             application/json:
               schema:
@@ -5096,8 +5166,8 @@ paths:
       summary: Classify a trusted Caddy enforcement hop
       description: >-
         Internal forward_auth hop (Caddy normally uses GET). Classification errors allow traffic with
-        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses access.blocked_status_code
-        and may close the socket in silent mode.
+        X-CatWAF-Verdict=allow-error; authentication failure is 404. Blocking uses
+        access.blocked_status_code and may close the socket in silent mode.
       responses:
         '200':
           description: Operation result
@@ -5120,6 +5190,12 @@ paths:
                 type: string
         '404':
           description: Resource not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Enforcement failed; request refused.
           content:
             application/json:
               schema:
@@ -11953,3 +12029,144 @@ paths:
       security:
         - metricsToken: []
       x-catwaf-access: metrics-policy
+
+  /api/kubernetes:
+    get:
+      tags:
+        - Operations
+      summary: Read Kubernetes ingress controller status and routes
+      responses:
+        '200':
+          description: Operation result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                description: Configured discovery rules, status and tradeoffs.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '410':
+          description: Rotating API segment expired; obtain a fresh segment from /api/handshake.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      operationId: get_api_kubernetes
+      x-catwaf-source: backend/routes/ops.js
+      security:
+        - bearerAuth: []
+          requestSignature: []
+          requestTimestamp: []
+          requestNonce: []
+      x-catwaf-access: session
+      servers:
+        - url: /g/{segment}
+          description: Use the current segment returned by login or handshake.
+          variables:
+            segment:
+              default: '00000000000000000000000000000000'
+              description: Replace with api.segment from the live session; the placeholder is not usable.
+  /api/kubernetes/scan:
+    post:
+      tags:
+        - Operations
+      summary: Preview or reconcile Kubernetes ingress routes
+      description: >-
+        Defaults to a dry run. dry_run=false publishes validated routes atomically. Requires the admin
+        role.
+      responses:
+        '200':
+          description: Operation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  dryRun:
+                    type: boolean
+                  routes:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - host
+                        - path
+                        - pathType
+                        - upstream
+                        - tls
+                      properties:
+                        id:
+                          type: string
+                        host:
+                          type: string
+                        path:
+                          type: string
+                        pathType:
+                          type: string
+                          enum:
+                            - Exact
+                            - Prefix
+                        upstream:
+                          type: string
+                        tls:
+                          type: string
+                          enum:
+                            - 'off'
+                            - auto
+                            - secret
+                        policy:
+                          type: object
+                          additionalProperties: true
+        '400':
+          description: Invalid input or refused operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Admin role required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '410':
+          description: Rotating API segment expired; obtain a fresh segment from /api/handshake.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run:
+                  type: boolean
+                  default: true
+      operationId: post_api_kubernetes_scan
+      x-catwaf-source: backend/routes/ops.js
+      security:
+        - bearerAuth: []
+          requestSignature: []
+          requestTimestamp: []
+          requestNonce: []
+      x-catwaf-access: admin
+      servers:
+        - url: /g/{segment}
+          description: Use the current segment returned by login or handshake.
+          variables:
+            segment:
+              default: '00000000000000000000000000000000'
+              description: Replace with api.segment from the live session; the placeholder is not usable.

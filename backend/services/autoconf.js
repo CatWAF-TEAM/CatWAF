@@ -16,6 +16,7 @@ const settings = require('./settings')
 const logger = require('./logger')
 
 const log = logger.child('autoconf')
+let inFlight = false
 
 // Labels are attacker-influenceable if someone can start a container, so
 // every value goes through a parser that constrains it to its type rather
@@ -24,6 +25,8 @@ const LABEL_SPEC = {
   enable: { type: 'bool' },
   port: { type: 'int', min: 1, max: 65535 },
   host: { type: 'host' },
+  network: { type: 'network' },
+  tls: { type: 'enum', values: ['off', 'auto'] },
   path: { type: 'uri' },
   protocol: { type: 'enum', values: ['http', 'https', 'grpc'] },
   paranoia: { type: 'int', min: 1, max: 4 },
@@ -49,9 +52,11 @@ function parseLabelValue(spec, raw) {
     case 'enum':
       return spec.values.includes(value.toLowerCase()) ? value.toLowerCase() : null
     case 'host':
-      return /^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/.test(value) ? value.toLowerCase() : null
+      return require('./managedRoutes').hostname(value.toLowerCase()) ? value.toLowerCase() : null
+    case 'network':
+      return /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value) ? value : null
     case 'uri':
-      return value.startsWith('/') && value.length <= 512 && !/[\s`"'{}\\]/.test(value) ? value : null
+      return value.startsWith('/') && value.length <= 512 && !/[\s`"'{}\\\x00-\x1f\x7f]/.test(value) ? value : null
     case 'list': {
       const items = value.split(/[\s,]+/).filter(Boolean)
       const parsed = items.map(item => parseLabelValue({ type: spec.item === 'method' ? 'enum' : 'uri', values: ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'] }, item))
@@ -103,6 +108,7 @@ function planFor(labelled) {
   }
   if (labelled.protocol) {
     patches.proxy = { ...(patches.proxy || {}), protocol: labelled.protocol }
+    if (labelled.protocol === 'https') patches.proxy.upstream_tls_verify = true
   }
   if (labelled.websockets) {
     patches.proxy = { ...(patches.proxy || {}), websockets: labelled.websockets }
@@ -114,80 +120,45 @@ function planFor(labelled) {
   return { patches, waf }
 }
 
-async function scan({ dryRun = null } = {}) {
+async function scan({ dryRun = null, containers = null } = {}) {
   const cfg = settings.get('autoconf')
   if (!cfg.enabled) return { ok: true, skipped: 'disabled', changed: false }
-
-  const effectiveDryRun = dryRun === null ? cfg.dry_run : dryRun
-
-  let discovery
+  if (inFlight) return { ok: false, error: 'Docker reconciliation is already running', changed: false }
+  inFlight = true
   try {
-    discovery = require('./discovery')
-  } catch (e) {
-    return { ok: false, error: `Discovery is unavailable: ${e.message}` }
-  }
-
-  let result
-  try {
-    result = await discovery.discover({ quick: true })
-  } catch (e) {
-    return { ok: false, error: `Container discovery failed: ${e.message}` }
-  }
-
-  const containers = result?.webApps || result?.containers || []
-  const managed = []
-  const ignored = []
-  const problems = []
-
-  for (const container of containers) {
-    const { labels, rejected } = readLabels(container, cfg.label_prefix)
-    for (const r of rejected) problems.push({ container: container.name, ...r })
-
-    if (!Object.keys(labels).length) {
-      ignored.push({ container: container.name, reason: 'no CatWAF labels — discovery still suggests it, nothing is applied automatically' })
-      continue
+    const inventory = containers || await require('./dockerSource').list()
+    const routes = [], ignored = [], problems = []
+    for (const container of inventory) {
+      const { labels, rejected } = readLabels(container, cfg.label_prefix)
+      if (!container.running || labels.enable === false || (cfg.require_enable_label && labels.enable !== true) || !Object.keys(labels).length) {
+        ignored.push(container.name); continue
+      }
+      if (rejected.length) { problems.push(...rejected.map(r => ({ container: container.name, ...r }))); continue }
+      if (!labels.host || !labels.port) { problems.push({ container: container.name, reason: 'Both host and port labels are required' }); continue }
+      const networks = container.networks || {}
+      const network = labels.network || cfg.network || (Object.keys(networks).length === 1 ? Object.keys(networks)[0] : '')
+      const address = networks[network]?.IPAddress || networks[network]?.GlobalIPv6Address
+      const family = require('net').isIP(address || '')
+      if (!family) { problems.push({ container: container.name, reason: 'Choose a network shared with the CatWAF proxy' }); continue }
+      const upstream = (labels.protocol === 'https' ? 'https://' : labels.protocol === 'grpc' ? 'h2c://' : '') + (family === 6 ? '[' + address + ']' : address) + ':' + labels.port
+      const plan = planFor(labels)
+      delete plan.patches.sites
+      routes.push({ id: container.id, host: labels.host, path: labels.path || '/', pathType: 'Prefix', upstream, tls: labels.tls || 'off', policy: plan })
     }
-    if (cfg.require_enable_label && labels.enable !== true) {
-      ignored.push({ container: container.name, reason: `${cfg.label_prefix}.enable is not set to true` })
-      continue
-    }
-    managed.push({ container: container.name, labels, plan: planFor(labels) })
-  }
-
-  if (effectiveDryRun) {
-    log.info('Autoconf dry run', { managed: managed.length, ignored: ignored.length })
-    return { ok: true, dryRun: true, managed, ignored, problems, changed: false }
-  }
-
-  const applied = []
-  const failures = []
-  for (const entry of managed) {
-    for (const [group, patch] of Object.entries(entry.plan.patches)) {
-      const r = settings.set(group, patch)
-      if (r.ok) applied.push({ container: entry.container, group })
-      else failures.push({ container: entry.container, group, error: r.error })
-    }
-    if (Object.keys(entry.plan.waf).length) {
-      const state = require('./state')
-      // Under the config lock with a fresh re-read, like every other WAF
-      // writer — an autoconf scan racing the dashboard can no longer
-      // overwrite a paranoia change made seconds earlier.
-      state.updateWAF(w => { Object.assign(w, entry.plan.waf) }, { label: 'autoconf.waf' })
-      applied.push({ container: entry.container, group: 'waf' })
-    }
-  }
-
-  const changed = applied.length > 0
-  if (changed) log.info('Autoconf applied container labels', { applied: applied.length, failures: failures.length })
-  return { ok: true, managed: managed.length, ignored: ignored.length, applied, failures, problems, changed }
+    if (problems.length) return { ok: false, changed: false, error: 'Invalid container labels; previous routes retained.', problems, ignored }
+    if (JSON.stringify(cfg) !== JSON.stringify(settings.get('autoconf'))) throw new Error('Docker settings changed during discovery; retry with the current settings')
+    const result = require('./managedRoutes').reconcile('docker', routes, { dryRun: dryRun === null ? cfg.dry_run : dryRun, removeOrphans: cfg.remove_orphans })
+    return { ...result, managed: routes.length, ignored, problems }
+  } catch (e) { return { ok: false, changed: false, error: e.message } }
+  finally { inFlight = false }
 }
-
 function describe() {
   const cfg = settings.get('autoconf')
   return {
     enabled: cfg.enabled,
     prefix: cfg.label_prefix,
     dry_run: cfg.dry_run,
+    routes: require('./managedRoutes').read().docker?.routes || [],
     labels: Object.entries(LABEL_SPEC).map(([name, spec]) => ({
       label: `${cfg.label_prefix}.${name}`,
       type: spec.type,
@@ -201,6 +172,8 @@ function describe() {
       '    labels:',
       `      ${cfg.label_prefix}.enable: "true"`,
       `      ${cfg.label_prefix}.port: "3000"`,
+      `      ${cfg.label_prefix}.host: "app.example.com"`,
+      `      ${cfg.label_prefix}.network: "catwaf"`,
       `      ${cfg.label_prefix}.paranoia: "2"`,
       `      ${cfg.label_prefix}.headers: "strict"`,
       `      ${cfg.label_prefix}.bypass: "/webhooks/*"`,

@@ -101,6 +101,7 @@ async function runJob(name, { manual = false } = {}) {
   let record
   try {
     const result = await job.fn({ manual })
+    if (result?.ok === false) throw new Error(result.error || 'Job reported failure')
     record = {
       started_at: startedAt,
       finished_at: new Date().toISOString(),

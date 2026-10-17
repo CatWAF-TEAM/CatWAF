@@ -59,7 +59,7 @@ router.post('/api/bans', authRequired, writeRequired, (req, res) => {
   }
   if (seconds !== null && (!Number.isInteger(seconds) || seconds < 1)) return bad(res, 'seconds must be a positive whole number, or null for a permanent ban')
 
-  const result = bans.ban({ target, source: 'manual', seconds, reason: String(reason).slice(0, 300), escalateRepeat: false })
+  const result = bans.addManual({ target, seconds, reason: String(reason).slice(0, 300) })
   if (!result.ok) return bad(res, result.error)
   enforce.invalidate(target)
   auditSvc.audit(req, 'ban.add', target, { seconds, reason })

@@ -478,8 +478,7 @@ function buildCorazaSnippet(waf) {
 // directive itself, so an exempt path never enters inspection at all rather
 // than being inspected and then allowed. Only emitted when at least one
 // bypass path exists, which keeps the default output byte-identical.
-function corazaMatcherLines() {
-  const access = extendedSettings('access')
+function corazaMatcherLines(access = extendedSettings('access')) {
   const paths = access && Array.isArray(access.waf_bypass_paths) ? access.waf_bypass_paths : []
   const safe = paths.filter(p => typeof p === 'string' && p.startsWith('/') && !/[\s`"'{}\\]/.test(p))
   if (!safe.length) return { matcher: null, lines: [] }
@@ -759,6 +758,7 @@ function renderCaddyfileGeneration(content, waf) {
 
   out = ensureGlobalOrderDirective(out)
   out = patchGlobalRegion(out)
+  out = require('./managedRoutes').patch(out, waf)
   out = patchCatchAllRegion(out)
   return out
 }
@@ -949,7 +949,7 @@ module.exports = {
   GLOBAL_MARKER_START, GLOBAL_MARKER_END, CATCHALL_MARKER_START, CATCHALL_MARKER_END,
   detectCaddyfilePath, candidatePaths, scoreCaddyfilePath: scorePath,
   lastSiteBlockClose, globalOptionsRange, ensureGlobalOrderDirective,
-  topLevelBlocks, enclosingSiteBlock, upstreamsIn, currentSiteContext,
+  topLevelBlocks, enclosingSiteBlock, upstreamsIn, currentSiteContext, catwafBackendAddress,
   renderCaddyfile, lastRenderReport, denyAction, corazaMatcherLines,
   buildWAFBlock, buildCorazaSnippet, patchWAFCaddyfile, readCaddyfile, reloadCaddy,
   isCaddyRunning, isAdminReachable, getCaddyModules, getCaddyPid,

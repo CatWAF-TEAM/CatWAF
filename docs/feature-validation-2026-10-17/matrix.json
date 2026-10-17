@@ -1,0 +1,212 @@
+[
+  {
+    "file": "apps-api.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 27806
+  },
+  {
+    "file": "attack.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 28663
+  },
+  {
+    "file": "audit-lifetime-e2e.test.js",
+    "status": 1,
+    "signal": null,
+    "ms": 10551
+  },
+  {
+    "file": "audit-log.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 158
+  },
+  {
+    "file": "audit-rotation.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 16382
+  },
+  {
+    "file": "catai.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 7150
+  },
+  {
+    "file": "concurrency.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 2928
+  },
+  {
+    "file": "discovery.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 2928
+  },
+  {
+    "file": "edge-e2e.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 752
+  },
+  {
+    "file": "edition.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 5267
+  },
+  {
+    "file": "extensions.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 16199
+  },
+  {
+    "file": "feature-parity.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 2382
+  },
+  {
+    "file": "features.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 4900
+  },
+  {
+    "file": "healthcheck.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 1374
+  },
+  {
+    "file": "image-policy.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 149
+  },
+  {
+    "file": "openapi-drift.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 20105
+  },
+  {
+    "file": "orchestration-client.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 611
+  },
+  {
+    "file": "orchestration-e2e.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 11772
+  },
+  {
+    "file": "platform.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 6888
+  },
+  {
+    "file": "protect-e2e.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 3151
+  },
+  {
+    "file": "protection-units.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 1960
+  },
+  {
+    "file": "qr.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 307
+  },
+  {
+    "file": "reliability-e2e.test.js",
+    "status": 1,
+    "signal": null,
+    "ms": 11642
+  },
+  {
+    "file": "render.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 2433
+  },
+  {
+    "file": "restore-e2e.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 5793
+  },
+  {
+    "file": "security-audit.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 14989
+  },
+  {
+    "file": "security-recovery.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 8696
+  },
+  {
+    "file": "security.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 13944
+  },
+  {
+    "file": "sfl-e2e.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 3241
+  },
+  {
+    "file": "storage-failure.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 1344
+  },
+  {
+    "file": "subdomain.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 8891
+  },
+  {
+    "file": "trust-proxy.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 40201
+  },
+  {
+    "file": "upload-scan.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 6097
+  },
+  {
+    "file": "waf-e2e.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 3334
+  },
+  {
+    "file": "waftools.test.js",
+    "status": 0,
+    "signal": null,
+    "ms": 21478
+  }
+]

@@ -18,11 +18,9 @@
 //   * /catwaf-challenge is deliberately public — it is served to unverified
 //     visitors — and holds no state beyond a short-lived signed token.
 //
-// One failure mode matters more than the others: if /api/enforce returned a
-// non-2xx for an operational reason, forward_auth would read that as "deny"
-// and take the whole site down. Every error path here therefore answers 200
-// with an allow verdict; enforcement failing open is the only safe default
-// for a layer that sits in front of the real WAF.
+// An enabled enforcement gate is a security dependency. Individual optional
+// feeds can explicitly fail open; an unexpected pipeline failure cannot
+// bypass configured bans or challenges.
 
 const express = require('express')
 const crypto = require('crypto')
@@ -113,9 +111,9 @@ router.all('/api/enforce', async (req, res) => {
   try {
     verdict = await enforce.evaluate({ ip, uri, userAgent, headers })
   } catch (e) {
-    log.error('Enforcement pipeline failed — allowing the request', { error: e.message, ip })
-    res.set('X-CatWAF-Verdict', 'allow-error')
-    return res.status(200).json({ action: 'allow', error: e.message })
+    log.error('Enforcement pipeline failed', { error: e.message, ip })
+    res.set('X-CatWAF-Verdict', 'unavailable')
+    return res.status(503).json({ detail: 'Security verification unavailable' })
   }
 
   if (verdict.action === 'block') {
@@ -163,7 +161,9 @@ const HOP_BY_HOP = new Set([
 function uploadUpstreamAllowed(target) {
   const caddySvc = require('../services/caddy')
   let known = []
-  try { known = caddySvc.currentSiteContext().upstreams || [] } catch { known = [] }
+  try {
+    known = [...(caddySvc.currentSiteContext().upstreams || []), ...require('../services/managedRoutes').allRoutes().map(r => r.upstream)]
+  } catch { known = [] }
   // Return the configured scheme, not the caller's version: old rendered
   // headers omitted https:// and must never silently downgrade to HTTP.
   return known.find(u => String(u) === target || String(u).replace(/^https?:\/\//, '') === target) || null
@@ -354,14 +354,14 @@ function isSecureRequest(req) {
 // loops forever. This page-specific policy allows exactly what the page
 // needs and nothing more; it is only sent with challenge HTML.
 function challengeCsp(cfg) {
-  const sources = require('../services/challenge/providers').cspSources(cfg.provider)
+  const sources = require('../services/challenge/providers').cspSources(cfg.provider, cfg)
   const list = () => (sources.length ? sources.join(' ') : "'none'")
   return [
     "default-src 'none'",
     `script-src 'self' 'unsafe-inline'${sources.length ? ' ' + sources.join(' ') : ''}`,
     `frame-src ${list()}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    `img-src 'self' data: ${sources.join(' ')}`,
     `connect-src 'self'${sources.length ? ' ' + sources.join(' ') : ''}`,
     "font-src 'self' data:",
     "base-uri 'none'",
@@ -383,6 +383,7 @@ router.get('/catwaf-challenge', challengeGetLimiter, (req, res) => {
   })
   res.set('Cache-Control', 'no-store, private')
   res.set('X-Robots-Tag', 'noindex, nofollow')
+  res.set('Set-Cookie', challenge.pendingCookieHeader(issued.id, issued.expiresIn, { secure: isSecureRequest(req) }))
   res.set('Content-Security-Policy', challengeCsp(cfg))
   res.type('html').status(503).send(issued.html)
 })
@@ -411,6 +412,8 @@ router.post('/catwaf-challenge/verify', challengeVerifyLimiter, challengeBody, a
       answer: body.answer,
       proof: body.proof,
       providerToken,
+      cookieId: challenge.parseCookies(req.headers.cookie)[challenge.PENDING_COOKIE],
+      hostname: req.hostname,
     })
   } catch (e) {
     log.error('Challenge verification failed', { error: e.message })
@@ -437,11 +440,16 @@ router.post('/catwaf-challenge/verify', challengeVerifyLimiter, challengeBody, a
 
   if (!result.ok) {
     const reissued = challenge.issue({ ip, userAgent: req.headers['user-agent'], returnTo, error: result.error })
+    res.set('Cache-Control', 'no-store, private')
+    res.set('Set-Cookie', challenge.pendingCookieHeader(reissued.id, reissued.expiresIn, { secure: isSecureRequest(req) }))
     res.set('Content-Security-Policy', challengeCsp(cfg))
     return res.status(403).type('html').send(reissued.html)
   }
 
-  res.set('Set-Cookie', challenge.cookieHeader(result.token, result.maxAge, { secure: isSecureRequest(req) }))
+  res.set('Set-Cookie', [
+    challenge.cookieHeader(result.token, result.maxAge, { secure: isSecureRequest(req) }),
+    challenge.pendingCookieHeader('', 0, { secure: isSecureRequest(req) }),
+  ])
   res.set('Cache-Control', 'no-store, private')
   return res.redirect(303, returnTo)
 })

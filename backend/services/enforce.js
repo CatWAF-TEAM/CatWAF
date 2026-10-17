@@ -14,9 +14,8 @@
 //   * Bounded latency. Everything network-bound runs in parallel under one
 //     deadline. Individual intelligence sources cache their own results;
 //     request-dependent final verdicts are recomputed on every request.
-//   * Fail open. If a signal errors or times out, it contributes nothing.
-//     These are advisory signals layered on top of the WAF; none of them is
-//     load-bearing enough to justify refusing traffic when it breaks.
+//   * Explicit failure policy. Advisory signal errors contribute nothing;
+//     CrowdSec's configured fail-closed policy also applies to timeouts.
 
 const cache = require('./intel/cache')
 const bans = require('./bans')
@@ -47,6 +46,7 @@ const RUNTIME_GROUPS = [
   'challenge', 'greylist', 'asn_lists', 'rdns_lists', 'dnsbl',
   'community_lists', 'threat_feed', 'threat_network', 'client_probe', 'bad_behavior',
   'tools_fingerprint', 'canary',
+  'ban_enforcement',
 ]
 
 // Canary paths are intent, not traffic: no legitimate visitor ever requests
@@ -204,8 +204,11 @@ async function classify(request, { dryRun = false } = {}) {
   let asnNumber = null
   let rdnsName = null
   for (const entry of gathered) {
-    if (entry.timedOut) { signals.push({ source: entry.name, decision: 'unavailable', reason: 'Timed out — not counted.' }); continue }
-    if (entry.error) { signals.push({ source: entry.name, decision: 'unavailable', reason: entry.error }); continue }
+    if (entry.timedOut || entry.error) {
+      const closed = entry.name === 'threat_feed' && !settings.get('threat_feed').fail_open
+      signals.push({ source: entry.name, decision: closed ? 'block' : 'unavailable', reason: entry.error || 'Signal deadline exceeded.' })
+      continue
+    }
     if (!entry.value) continue
     if (entry.name === 'asn' && entry.value.asn) asnNumber = entry.value.asn
     if (entry.name === 'rdns' && entry.value.rdns) rdnsName = entry.value.rdns
@@ -217,6 +220,13 @@ async function classify(request, { dryRun = false } = {}) {
   if (settings.get('community_lists').enabled) {
     const verdict = await lists.evaluate({ ip, asn: asnNumber, rdns: rdnsName, userAgent, uri })
     if (verdict) signals.push({ source: 'community', ...verdict })
+  }
+
+  // A CrowdSec decision cannot be bypassed by an automatic community allow.
+  const required = signals.find(s => s.source === 'threat_feed' && ['block', 'challenge'].includes(s.decision))
+  if (required) {
+    const mode = settings.get('challenge').mode
+    return { action: required.decision === 'challenge' && mode !== 'off' ? 'challenge' : 'block', reason: required.reason, signals }
   }
 
   // A verified crawler or a community allow entry short-circuits the rest.

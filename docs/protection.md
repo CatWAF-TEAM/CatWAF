@@ -35,35 +35,21 @@ The order matters, and it is not arbitrary:
 3. **Everything else, in parallel, under one deadline.** ASN, reverse DNS,
    DNSBL, the local threat feed and the shared threat network are queried
    together. A source that times out is recorded as *unavailable* and does not
-   count as either a hit or a miss.
+   count as either a hit or a miss, except CrowdSec configured to fail closed.
 4. **Scoring and the verdict**, recomputed for each request. Individual
    intelligence sources cache their own results; request-dependent decisions
    are not shared between URLs or visitors' credentials.
 
 Two properties are worth knowing because they shape everything else:
 
-**The hop fails open.** Every error path answers *allow*. `forward_auth` reads
-a non-2xx as "deny", so a bug or a hiccup in this layer would otherwise take
-the protected site down. A protection layer that can black-hole your site when
-it breaks is worse than one that occasionally lets a bad request through.
+**An enabled gate fails closed on pipeline errors.** Unexpected failures return
+503, without private diagnostics. Individual advisory sources can fail open;
+CrowdSec follows its explicit fail_open setting, including the shared deadline.
+A failed Caddy-to-backend connection also refuses the request.
 
-**Signal latency is bounded.** The gather step has a 2.5-second deadline.
-Anything that has not answered by then is ignored for that request. A slow
-source can still add up to that deadline to the request's latency.
-
-**Failing open has a limit you should know about.** "Fails open" covers every
-error CatWAF can *answer* — a lookup that throws, a source that times out, a
-malformed verdict. It cannot cover CatWAF not answering at all. If the CatWAF
-API process is stopped or unreachable while the hop is rendered, Caddy's dial
-fails, `forward_auth` reads that as a denial, and the protected site returns
-502 on connection failure, or 504 on a response timeout. The transport allows
-one second to connect and five seconds to receive response headers; reads have
-a six-second deadline and writes a five-second deadline. The header deadline
-fires before the read deadline to avoid an automatic retry on a stale pooled
-connection doubling the wait.
-A stalled API therefore fails within a bounded wait instead of leaving
-connections open indefinitely. These failures do not bypass enabled challenges
-or bans. The bounds apply to the enforcement hop, not the origin's own response.
+**Signal latency is bounded.** Gathering has a 2.5-second deadline. The Caddy
+transport bounds dialing to 1 second and response headers to 5 seconds (6-second
+read timeout). These bounds apply to enforcement, not the origin response.
 
 This is why **every runtime feature ships disabled**, including
 `tools_fingerprint`, which used to be on by default. A default install renders
@@ -454,3 +440,32 @@ against a real address.
 - [CLI reference](cli.md#configure) — `settings`, `bans`, `jobs`, `cache`
 - [Plugins](plugins.md) — the data-only extension contract
 - [Metrics](metrics.md) — what to graph
+
+## Changes in the Free integrations update
+
+Adding the first manual runtime ban now activates the backend gate in the same
+configuration transaction. Validation or reload failure rolls it back. The gate
+stays enabled after lifting the ban so later bans do not need another reload.
+Keep Runtime bans enabled while using the local ban store. Lite can use the
+static IP blacklist; runtime bans need the Full install's Node backend.
+
+Cookie challenges require the issued pending cookie on verification. Signed pass
+cookies are bound to client and challenge policy; policy changes invalidate old
+passes. Local CAPTCHA uses raster pixels without HTML text containing the answer.
+Provider responses require hostname and freshness verification. Enter keys in
+Challenge Gate, not in CatAI chat. mCaptcha uses its native JSON verification API
+and an origin/source-checked iframe response.
+
+The CrowdSec bouncer uses Local API query mode with a read-only bouncer API key.
+Run `npm run test:crowdsec` on a Linux Docker host for a disposable live Local
+API compatibility check. It uses `crowdsecurity/crowdsec:v1.8.1` by default
+(`CATWAF_CROWDSEC_IMAGE` can select another image), an internal test network and
+no published ports. Online registration and log ingestion are disabled; the
+test removes its container, volumes and network when finished.
+Default cache lifetime is 60 seconds; removed decisions can remain effective
+until that cache expires, never past their returned expiry. Ban decisions do
+not become persistent local bans. CAPTCHA decisions require image or provider
+mode; otherwise they block. Automatic community allows and path exemptions do
+not override CrowdSec; explicit administrator IP allowlists still do.
+
+See [controller setup](orchestration.md) and [feature coverage](bunkerweb-feature-coverage.md).

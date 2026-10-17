@@ -211,11 +211,22 @@ router.get('/api/autoconf', authRequired, (req, res) => res.json(autoconf.descri
 router.post('/api/autoconf/scan', authRequired, writeRequired, async (req, res) => {
   const result = await autoconf.scan({ dryRun: req.body?.dry_run !== false })
   if (!result.ok) return bad(res, result.error)
-  if (!result.dryRun) auditSvc.audit(req, 'autoconf.apply', '', { applied: result.applied?.length })
+  if (!result.dryRun && !result.skipped) auditSvc.audit(req, 'autoconf.apply', '', { routes: result.routes?.length })
   res.json(result)
 })
 
 // ─── Sites (#65) ────────────────────────────────────────────────────────
+router.get('/api/kubernetes', authRequired, (req, res) => {
+  res.json(require('../services/kubernetes').describe())
+})
+
+router.post('/api/kubernetes/scan', authRequired, writeRequired, async (req, res) => {
+  const result = await require('../services/kubernetes').scan({ dryRun: req.body?.dry_run !== false })
+  if (!result.ok) return bad(res, result.error)
+  if (!result.dryRun) auditSvc.audit(req, 'kubernetes.apply', '', { routes: result.routes?.length })
+  res.json(result)
+})
+
 
 router.get('/api/sites', authRequired, (req, res) => res.json(sites.describe()))
 

@@ -24,7 +24,8 @@ CatWAF sits in front of your website and inspects every request through Coraza �
 Go source or custom proxy runtime patches. Release validation is still blocked by
 reload connection resets, audit-record loss during overlapping requests and log
 rotations, and one unsuppressed dependency-module advisory. See the
-[current security recheck](docs/security-recheck-2026-10-17.md) for measured results.
+[security recheck](docs/security-recheck-2026-10-17.md) and
+[feature validation](docs/feature-validation-2026-10-17.md) for measured results.
 
 ### What stops the bad guys
 
@@ -32,11 +33,15 @@ rotations, and one unsuppressed dependency-module advisory. See the
 - **Canary auto-ban** — probing `/.env` or `/.git` is an instant, escalating ban
 - **Edge ban enforcement** — banned addresses are dropped by Caddy itself, no hop to CatWAF
 - **Kernel-level drops (opt-in)** — mirror bans into nftables so they die at SYN
-- **Challenge gate + tool fingerprinting + DNSBL/community lists/ASN/rDNS** — layered reputation before payloads are evaluated
+- **Bot challenges** — cookie round trips, JavaScript work, local image CAPTCHA, reCAPTCHA v2, hCaptcha, Turnstile and mCaptcha
+- **CrowdSec query bouncer** — IP/range bans and CAPTCHA decisions with expiry and explicit outage policy
+- **Manual rules and bans** — structured Coraza rules, IP/CIDR bans, expiry and lifting
+- **Docker autoconf and Kubernetes ingress** — validated host/path routes, scoped discovery and TLS Secret rotation
+- **Tool fingerprinting + DNSBL/community lists/ASN/rDNS** — layered reputation before payloads are evaluated
 - **Under-attack mode** — one switch that challenges every visitor, with a fresh verdict for each request
 - **Alerts that actually fire** — spikes, new bans and engine changes delivered to Slack/Discord/Telegram/webhooks
 
-**CatWAF Free is the website-owner edition:** one site, one admin, no fleet management or SOC tooling. Everything here is meant to be usable without being a security engineer.
+**CatWAF Free supports multiple protected hosts** with an explicit capacity setting (default 1, configurable up to 1000). The Full installation adds Node.js Docker and Kubernetes controllers; it is still the free product. See [feature coverage](docs/bunkerweb-feature-coverage.md) and [controller setup](docs/orchestration.md).
 
 ## Two editions
 
@@ -50,6 +55,7 @@ Pick one at install time. The WAF is identical in both — the edition decides w
 | SQLite event + request log | ✓ | ✓ |
 | systemd service | ✓ | ✓ |
 | HTTP API server | — | ✓ |
+| Runtime challenges, manual ban gate, CrowdSec, controllers | — | ✓ |
 | Web dashboard | — | ✓ |
 | Attack Map, Threats, Logs, Rules pages | — | ✓ |
 | CatAI assistant (optional) | — | ✓ |
@@ -280,7 +286,7 @@ Control panels regenerate their own vhosts, so a file written underneath them wo
 
 **Client reputation** — The rule engine asks *is this request malicious?*; this layer asks *should this client be here at all?* A challenge gate (cookie, JavaScript proof-of-work, a self-hosted captcha, or reCAPTCHA/hCaptcha/Turnstile/mCaptcha), behavioural banning, ASN and forward-confirmed reverse-DNS rules, DNSBLs and subscribed community blocklists. Every feature that stops an address writes to [one ban store](docs/protection.md#active-bans), so "why is this visitor blocked" has a single answer. All of it is off by default. See [the protection guide](docs/protection.md).
 
-**Configuration** — Around 326 settings across 46 groups — TLS and certificates, reverse-proxy behaviour, response headers, CORS, compression, caching, generated `robots.txt` and `security.txt` — reachable from the dashboard, `catwaf settings`, or the API, all through the same validation. Every change can be [previewed as a Caddyfile diff](docs/cli.md#catwaf-settings) before it applies, and is validated by Caddy and rolled back if it wouldn't load. See the [settings reference](docs/settings.md).
+**Configuration** — 335 settings across 48 groups — TLS and certificates, reverse-proxy behaviour, response headers, CORS, compression, caching, generated `robots.txt` and `security.txt` — reachable from the dashboard, `catwaf settings`, or the API, all through the same validation. Every change can be [previewed as a Caddyfile diff](docs/cli.md#catwaf-settings) before it applies, and is validated by Caddy and rolled back if it wouldn't load. See the [settings reference](docs/settings.md).
 
 **Operations** — One scheduler for every timed task, backups (optionally AES-256-GCM encrypted at rest) with a real restore path, configuration templates, CSV and printable reports, a [Prometheus endpoint](docs/metrics.md), a JSONL event stream for your SIEM, `catwaf update` against GitHub releases, and two-factor admin login. `catwaf doctor` reports what the installed Caddy build can actually do, and names anything you've switched on that couldn't be rendered because of a missing module — so an enabled feature is never a silent no-op.
 
@@ -436,7 +442,7 @@ CatWAF is a **management and deployment layer around Coraza** — it writes Cora
 
 In a default install CatWAF's backend is not in the request path at all. Two opt-in features change that, and both say so where you enable them:
 
-- **Runtime enforcement** (the client-reputation layer) adds a `forward_auth` hop from Caddy into CatWAF for the *headers* of each request. It fails open — every error path answers allow.
+- **Runtime enforcement** (the client-reputation layer) adds a `forward_auth` hop from Caddy into CatWAF for the *headers* of each request. An enabled gate refuses unexpected pipeline failures with HTTP 503; individual advisory sources follow their configured outage policy.
 - **Upload malware scanning** proxies the *body* of requests to the upload paths you nominate through CatWAF so they can be scanned. Only those paths; everything else still goes straight to the origin.
 
 That means:

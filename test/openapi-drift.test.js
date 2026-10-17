@@ -87,7 +87,7 @@ function check(name, fn) { fn(); pass++; console.log('  ok   ' + name) }
       '/api/alerts','/api/caddy/reload-queue/status','/api/bans','/api/bans/stats',
       '/api/challenge/status','/api/intel/lists','/api/intel/network','/api/intel/probe/tradeoffs',
       '/api/jobs','/api/backups','/api/telemetry','/api/templates','/api/templates/{id}','/api/templates/{id}/export',
-      '/api/plugins','/api/caches','/api/autoconf','/api/sites','/api/cluster','/api/database','/api/catai/status',
+      '/api/plugins','/api/caches','/api/autoconf','/api/kubernetes','/api/sites','/api/cluster','/api/database','/api/catai/status',
     ]
     for (const template of paths) {
       const url = template.replace('{group}','headers').replace('{id}',template.startsWith('/api/config/snapshots')?snapshot.id:template.startsWith('/api/templates')?'hardened-public-site':'942100')
@@ -95,6 +95,12 @@ function check(name, fn) { fn(); pass++; console.log('  ok   ' + name) }
       const signature = crypto.createHmac('sha256',login.sessionKey).update(['GET',url,ts,nonce,crypto.createHash('sha256').update('').digest('hex')].join('\n')).digest('hex')
       await validateResponse('GET',template,login.api.basePath+url,{headers:{Authorization:`Bearer ${login.token}`,'X-CatWAF-Ts':ts,'X-CatWAF-Nonce':nonce,'X-CatWAF-Sig':signature}})
       pass++; console.log('  ok   response schema GET ' + template)
+    }
+    for (const url of ['/api/autoconf/scan','/api/kubernetes/scan']) {
+      const body=JSON.stringify({dry_run:true}), ts=String(Date.now()), nonce=crypto.randomBytes(16).toString('hex')
+      const sig=crypto.createHmac('sha256',login.sessionKey).update(['POST',url,ts,nonce,crypto.createHash('sha256').update(body).digest('hex')].join('\n')).digest('hex')
+      const payload=await validateResponse('POST',url,login.api.basePath+url,{body,headers:{'Content-Type':'application/json',Authorization:`Bearer ${login.token}`,'X-CatWAF-Ts':ts,'X-CatWAF-Nonce':nonce,'X-CatWAF-Sig':sig}})
+      assert.equal(payload.skipped,'disabled');pass++;console.log('  ok   response schema POST '+url)
     }
   } finally { await new Promise(resolve => server.close(resolve)) }
   console.log(`\n${pass} passed, 0 failed, 0 warnings\n`)

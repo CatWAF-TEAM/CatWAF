@@ -613,6 +613,7 @@ const SCHEMA = {
       site_key: { type: 'str', default: '', maxLen: 256, label: 'Provider site key' },
       secret_key: { type: 'str', default: '', maxLen: 256, label: 'Provider secret key', writeOnly: true },
       provider_verify_url: { type: 'str', item: 'url', default: '', maxLen: 2048, label: 'Provider verify URL (mCaptcha/self-hosted)' },
+      provider_hostnames: { type: 'list', item: 'host', max: 50, default: [], label: 'Provider hostnames (empty uses the request hostname)' },
       valid_minutes: { type: 'int', min: 1, max: 10080, default: 1440, label: 'Solved challenge stays valid for (minutes)' },
       resolve_seconds: { type: 'int', min: 10, max: 3600, default: 300, label: 'Time allowed to solve (seconds)' },
       trigger: {
@@ -632,6 +633,12 @@ const SCHEMA = {
   },
 
   // ─── Behavioural banning (#6) ─────────────────────────────────────────
+  ban_enforcement: {
+    label: 'Runtime bans',
+    summary: 'Check the local ban store on every request. Enabled automatically when an administrator adds a ban; requires the backend to be available.',
+    fields: { enabled: { type: 'bool', default: false, label: 'Enforce runtime bans' } },
+  },
+
   bad_behavior: {
     label: 'Behavioural banning',
     idea: [6],
@@ -891,9 +898,9 @@ const SCHEMA = {
 
   // ─── Local threat feed (#13) ──────────────────────────────────────────
   threat_feed: {
-    label: 'Local threat feed',
+    label: 'CrowdSec bouncer',
     idea: [13],
-    summary: 'Consult a host-local behavioural daemon (CrowdSec-style bouncer API).',
+    summary: 'Enforce CrowdSec Local API IP/range bans and CAPTCHA decisions, with bounded caching and configurable outage policy.',
     secret: true,
     fields: {
       enabled: { type: 'bool', default: false, label: 'Enabled' },
@@ -1015,6 +1022,7 @@ const SCHEMA = {
         label: 'Label prefix',
       },
       interval_sec: { type: 'int', min: 30, max: 86400, default: 300, label: 'Scan interval (seconds)' },
+      network: { type: 'str', default: '', maxLen: 128, pattern: /^[A-Za-z0-9_.-]*$/, label: 'Network shared with the proxy (optional when labelled)' },
       require_enable_label: { type: 'bool', default: true, label: 'Require an explicit catwaf.enable=true label' },
       remove_orphans: { type: 'bool', default: false, label: 'Remove routes for containers that disappeared' },
       dry_run: { type: 'bool', default: false, label: 'Log what would change without applying it' },
@@ -1022,15 +1030,26 @@ const SCHEMA = {
   },
 
   // ─── Multi-site (#65) ─────────────────────────────────────────────────
+  kubernetes: {
+    label: 'Kubernetes ingress',
+    summary: 'Reconcile explicitly selected networking.k8s.io/v1 Ingress resources using a namespace-scoped service account.',
+    fields: {
+      enabled: { type: 'bool', default: false, label: 'Enabled' },
+      namespace: { type: 'str', default: 'default', maxLen: 63, pattern: /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/, label: 'Namespace' },
+      ingress_class: { type: 'str', default: 'catwaf', maxLen: 63, pattern: /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/, label: 'IngressClass name' },
+      controller: { type: 'str', default: 'catwaf.com/ingress-controller', maxLen: 253, pattern: /^[a-z0-9./-]+$/, label: 'IngressClass controller' },
+      interval_sec: { type: 'int', min: 5, max: 3600, default: 15, label: 'Reconcile interval (seconds)' },
+      dry_run: { type: 'bool', default: false, label: 'Preview without applying' },
+    },
+  },
+
   sites: {
     label: 'Protected sites',
     idea: [65],
-    summary: 'CatWAF Free protects one site. The registry exists so features stay single-site-safe as they grow.',
+    summary: 'Host registry and an explicit capacity limit for automatically managed sites.',
     fields: {
-      // Free's edition boundary, expressed as a number rather than as an
-      // assumption scattered through the code. Raising it in Free is refused
-      // by the sites service; it is here so a future tier flips one value.
-      max_sites: { type: 'int', min: 1, max: 1, default: 1, label: 'Maximum protected sites' },
+      // Explicit resource budget; both Free editions may raise it.
+      max_sites: { type: 'int', min: 1, max: 1000, default: 1, label: 'Maximum protected sites' },
       primary_host: { type: 'str', item: 'host', default: '', maxLen: 253, label: 'Primary hostname' },
       aliases: { type: 'list', item: 'host', max: 20, default: [], label: 'Additional hostnames for the same site' },
     },

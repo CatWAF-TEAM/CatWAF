@@ -47,9 +47,9 @@ function validateCaddyfile(filePath) {
     })
     return { ok: true, error: null }
   } catch (e) {
-    const out = (e.stderr?.toString() || e.stdout?.toString() || e.message || '')
+    const out = [e.stderr?.toString(), e.stdout?.toString(), e.message].filter(Boolean).join('\n')
     if (/ENOENT/.test(out) || e.code === 'ENOENT') return { ok: true, error: null, skipped: 'caddy binary not available' }
-    const line = out.split('\n').map(l => l.trim()).find(l => /^Error:|error:/i.test(l))
+    const line = out.split('\n').map(l => l.trim()).find(l => /^Error:|error:/i.test(l) || /"level":"error"/.test(l))
     return { ok: false, error: line || out.split('\n')[0] || 'validation failed' }
   }
 }

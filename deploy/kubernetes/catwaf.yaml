@@ -1,0 +1,274 @@
+# Build/load both images from this checkout before applying. See docs/orchestration.md.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: catwaf
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: catwaf
+  namespace: catwaf
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: catwaf-ingress
+  namespace: catwaf
+rules:
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses]
+    verbs: [get, list]
+  - apiGroups: ['']
+    resources: [services]
+    verbs: [get, list]
+  # No Secret list/watch access. Extend this allowlist only for TLS Secrets
+  # explicitly referenced by your Ingress objects.
+  - apiGroups: ['']
+    resources: [secrets]
+    resourceNames: [app-tls]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: catwaf-ingress
+  namespace: catwaf
+subjects:
+  - kind: ServiceAccount
+    name: catwaf
+    namespace: catwaf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: catwaf-ingress
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: catwaf-ingress-class
+rules:
+  - apiGroups: [networking.k8s.io]
+    resources: [ingressclasses]
+    resourceNames: [catwaf]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: catwaf-ingress-class
+subjects:
+  - kind: ServiceAccount
+    name: catwaf
+    namespace: catwaf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: catwaf-ingress-class
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: catwaf
+spec:
+  controller: catwaf.com/ingress-controller
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catwaf-state
+  namespace: catwaf
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catwaf-bootstrap
+  namespace: catwaf
+data:
+  Caddyfile: |
+    {
+      admin unix//run/catwaf-admin/admin.sock|0660
+      http_port 8080
+      https_port 8443
+      order coraza_waf first
+    }
+    http://bootstrap.invalid {
+      respond 404
+      # @@CATWAF_WAF_START@@
+      # @@CATWAF_WAF_END@@
+    }
+    :8081 {
+      bind 127.0.0.1
+      header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data:; font-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+      }
+      handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+      }
+      handle /g/* {
+        reverse_proxy 127.0.0.1:8000
+      }
+      handle {
+        root * /srv/dashboard
+        try_files {path} /index.html
+        file_server
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catwaf
+  namespace: catwaf
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {app: catwaf}
+  template:
+    metadata:
+      labels: {app: catwaf}
+    spec:
+      serviceAccountName: catwaf
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        seccompProfile: {type: RuntimeDefault}
+        fsGroup: 10100
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: initialize-state
+          image: catwaf-backend:1.0.2
+          imagePullPolicy: IfNotPresent
+          command: [node, -e]
+          args:
+            - |
+              const fs = require('fs');
+              for (const p of ['backend','backend/caddy','config','logs','caddy-data','caddy-runtime']) {
+                fs.mkdirSync('/state/'+p,{recursive:true});
+                fs.chmodSync('/state/'+p,0o2770);
+              }
+              if (!fs.existsSync('/state/config/Caddyfile')) fs.copyFileSync('/bootstrap/Caddyfile','/state/config/Caddyfile');
+              fs.chmodSync('/state/config/Caddyfile',0o640);
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10100
+            runAsGroup: 10100
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: '1', memory: 128Mi}
+          volumeMounts:
+            - {name: state, mountPath: /state}
+            - {name: bootstrap, mountPath: /bootstrap, readOnly: true}
+            - {name: admin, mountPath: /run/catwaf-admin}
+      containers:
+        - name: backend
+          image: catwaf-backend:1.0.2
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10100
+            runAsGroup: 10100
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          env:
+            - {name: HOST, value: 127.0.0.1}
+            - {name: PORT, value: '8000'}
+            - {name: CATWAF_INTERNAL_HOST, value: 127.0.0.1}
+            - {name: CADDYFILE_PATH, value: /etc/caddy/Caddyfile}
+            - {name: CADDY_ADMIN_SOCKET, value: /run/catwaf-admin/admin.sock}
+            - {name: CORAZA_AUDIT_LOG, value: /var/log/coraza/audit.json}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef: {name: catwaf-secrets, key: JWT_SECRET}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: '2', memory: 1Gi}
+          readinessProbe:
+            exec:
+              command: [node, -e, "fetch('http://127.0.0.1:8000/healthz',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            timeoutSeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - {name: state, mountPath: /app/data, subPath: backend}
+            - {name: state, mountPath: /etc/caddy, subPath: config}
+            - {name: state, mountPath: /var/log/coraza, subPath: logs}
+            - {name: admin, mountPath: /run/catwaf-admin, readOnly: true}
+            - {name: api-token, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true}
+            - {name: backend-tmp, mountPath: /tmp}
+        - name: caddy
+          image: catwaf-caddy:1.0.2
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10101
+            runAsGroup: 10100
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: https, containerPort: 8443}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: '2', memory: 1Gi}
+          readinessProbe:
+            exec:
+              command: [wget, -q, -O, /dev/null, 'http://127.0.0.1:8081/']
+            timeoutSeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - {name: state, mountPath: /etc/caddy, subPath: config, readOnly: true}
+            - {name: state, mountPath: /var/log/coraza, subPath: logs}
+            - {name: state, mountPath: /data, subPath: caddy-data}
+            - {name: state, mountPath: /config, subPath: caddy-runtime}
+            # Only generated assets are visible, never the SQLite directory.
+            - {name: state, mountPath: /app/data/caddy, subPath: backend/caddy, readOnly: true}
+            - {name: admin, mountPath: /run/catwaf-admin}
+            - {name: proxy-tmp, mountPath: /tmp}
+      volumes:
+        - name: state
+          persistentVolumeClaim: {claimName: catwaf-state}
+        - name: bootstrap
+          configMap: {name: catwaf-bootstrap}
+        - name: admin
+          emptyDir: {}
+        - name: backend-tmp
+          emptyDir: {sizeLimit: 256Mi}
+        - name: proxy-tmp
+          emptyDir: {sizeLimit: 256Mi}
+        - name: api-token
+          projected:
+            defaultMode: 0444
+            sources:
+              - serviceAccountToken: {path: token, expirationSeconds: 3600}
+              - configMap:
+                  name: kube-root-ca.crt
+                  items: [{key: ca.crt, path: ca.crt}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catwaf
+  namespace: catwaf
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector: {app: catwaf}
+  ports:
+    - {name: http, port: 80, targetPort: http}
+    - {name: https, port: 443, targetPort: https}

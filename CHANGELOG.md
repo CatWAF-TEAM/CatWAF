@@ -17,6 +17,24 @@ Release validation remains blocked by reload connection resets, an audit record
 lost across rotations, and an unsuppressed upstream Go module advisory. These
 checks remain enabled; this update is not a clean release-gate result.
 
+## Free integrations update — 2026-10-17
+
+See the [feature validation report](docs/feature-validation-2026-10-17.md)
+for passing checks, deployment limits and unsuppressed findings.
+
+- Implement Docker host/path autoconfiguration and namespace-scoped Kubernetes
+  v1 Ingress reconciliation in Node.js, with TLS Secrets and transactional rollback.
+- Add the Docker & Kubernetes dashboard, optional restricted metadata bridge,
+  Kubernetes manifests, API documentation and CatAI knowledge.
+- Fix cookie challenge round trips, CAPTCHA answer exposure, provider hostname /
+  freshness checks, mCaptcha verification and concurrent token replay.
+- Enforce CrowdSec IP/Range decision expiry and explicit outage policy without
+  creating stale permanent bans; enforce mandatory CAPTCHA before exemptions.
+- Activate runtime enforcement transactionally for the first manual ban. Return
+  503 on unexpected enforcement exceptions; report controller job failures.
+- Permit configurable Free site capacity up to 1000. This is a resource ceiling,
+  not a tested capacity or an HA promise. Existing release blockers remain.
+
 ## [Unreleased] — 2026-08-24 — Edge enforcement & alert delivery
 
 ### New: edge ban enforcement

@@ -1,0 +1,29 @@
+# Opt-in: docker compose -f docker-compose.yml -f compose.autoconf.yml up -d --build
+# The application backend receives only a metadata socket, never the engine socket.
+services:
+  backend:
+    environment:
+      CATWAF_DOCKER_METADATA_SOCKET: /run/catwaf-discovery/metadata.sock
+    volumes:
+      - docker-metadata:/run/catwaf-discovery:ro
+  docker-metadata:
+    build:
+      context: .
+      dockerfile: docker/Metadata.Dockerfile
+    restart: unless-stopped
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    mem_limit: 96m
+    group_add:
+      - "${DOCKER_GID:-0}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - docker-metadata:/run/catwaf-discovery
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '2'}
+volumes:
+  docker-metadata:

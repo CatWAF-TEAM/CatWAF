@@ -136,6 +136,25 @@ function ban({ target, source = 'manual', reason = '', seconds = null, ruleId = 
   return { ok: true, created: true, ban: get(id), duration_sec: duration }
 }
 
+// The first manual ban installs the runtime gate in the same transaction as
+// the ban itself. A failed validate/reload must not report an enforced ban.
+function addManual(options) {
+  if (require('./edition').isLite()) return { ok: false, error: 'Runtime bans require the Node.js backend. Run catwaf setup --full, or use the static IP blacklist on Lite.' }
+  if (options.seconds != null && (!Number.isInteger(options.seconds) || options.seconds < 1 || options.seconds > 31536000)) return { ok: false, error: 'Ban duration must be 1–31536000 seconds, or null for permanent' }
+  return require('./configLock').withConfigLock(() => {
+    if (settings.get('ban_enforcement').enabled) return ban({ ...options, source: 'manual', escalateRepeat: false })
+    const tx = require('./configTx').apply({ label: 'ban.enable', mutate: () => {
+      const enabled = settings.set('ban_enforcement', { enabled: true })
+      if (!enabled.ok) throw new Error(enabled.error)
+      const result = ban({ ...options, source: 'manual', escalateRepeat: false })
+      if (!result.ok) throw new Error(result.error)
+      return result
+    } })
+    invalidateCache()
+    return tx.ok ? { ...tx.result, reloaded: tx.reloaded, reloadError: tx.reloadError } : tx
+  })
+}
+
 function get(id) {
   return rowToBan(conn().prepare('SELECT * FROM active_bans WHERE id = ?').get(id))
 }
@@ -245,6 +264,6 @@ function clearAll() {
 }
 
 module.exports = {
-  SOURCES, ban, get, lift, liftTarget, check, list, purgeExpired, stats,
+  SOURCES, ban, addManual, get, lift, liftTarget, check, list, purgeExpired, stats,
   historyFor, clearAll, invalidateCache, onBanChange, notifyChange, listActiveTargets,
 }

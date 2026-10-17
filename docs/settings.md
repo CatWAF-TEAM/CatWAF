@@ -46,6 +46,7 @@ out.
 | [`error_pages`](#error_pages) | Replace the default error body for chosen status codes. |
 | [`redirects`](#redirects) | Ordered redirect rules evaluated before the proxy target. |
 | [`challenge`](#challenge) | Make ambiguous visitors prove they are a browser before passing them through. |
+| [`ban_enforcement`](#ban_enforcement) | Check the local ban store on every request. Enabled automatically when an administrator adds a ban; requires the backend to be available. |
 | [`bad_behavior`](#bad_behavior) | Ban an IP that generates too many error responses, even when no WAF rule fires. |
 | [`client_probe`](#client_probe) | Check whether a suspicious client is itself an open proxy or relay. |
 | [`tools_fingerprint`](#tools_fingerprint) | Score requests against known offensive tool signatures (sqlmap, nmap, nikto, gobuster, ...): an exact match bans the address, a close-but-uncertain match is challenged instead. Off by default — enabling it adds a runtime hop into CatWAF's API, which the protected site then depends on. |
@@ -56,14 +57,15 @@ out.
 | [`dnsbl`](#dnsbl) | Check the client address against public abuse-source zones. |
 | [`upload_scan`](#upload_scan) | Scan uploaded files with a local ClamAV daemon and refuse infected ones. |
 | [`threat_network`](#threat_network) | Opt in to exchanging anonymised attacker signals with other CatWAF instances. |
-| [`threat_feed`](#threat_feed) | Consult a host-local behavioural daemon (CrowdSec-style bouncer API). |
+| [`threat_feed`](#threat_feed) | Enforce CrowdSec Local API IP/range bans and CAPTCHA decisions, with bounded caching and configurable outage policy. |
 | [`jobs`](#jobs) | The internal scheduler every time-based feature registers into. |
 | [`backups`](#backups) | Copy configuration and data off the box on a schedule. |
 | [`metrics`](#metrics) | Prometheus-compatible scrape endpoint. |
 | [`telemetry`](#telemetry) | Off unless you turn it on. Nothing is collected while this is disabled. |
 | [`raw_config`](#raw_config) | Escape hatch for directives CatWAF does not model, by insertion context. |
 | [`autoconf`](#autoconf) | Continuously apply configuration derived from container labels. |
-| [`sites`](#sites) | CatWAF Free protects one site. The registry exists so features stay single-site-safe as they grow. |
+| [`kubernetes`](#kubernetes) | Reconcile explicitly selected networking.k8s.io/v1 Ingress resources using a namespace-scoped service account. |
+| [`sites`](#sites) | Host registry and an explicit capacity limit for automatically managed sites. |
 | [`cluster`](#cluster) | Optional external store for counters that must be consistent across nodes. |
 | [`database`](#database) | Engine choice and pool tuning. SQLite is the right answer at Free's scale. |
 | [`canary`](#canary) | Paths no legitimate visitor requests. Touching one is intent — probe it and the address is banned outright, before any payload is even evaluated. |
@@ -91,7 +93,7 @@ Host matching, method allowlist, deny behaviour and protocol limits.
 | `block_response_mode` | choice: `status`, `silent` | `status` | "silent" closes the connection without any response at all — invisible to fingerprinting tools, but a mistakenly blocked visitor also gets no explanation, which makes false positives much harder to diagnose. |
 | `disable_plain_http` | switch | `false` | Do not listen on :80 at all, rather than listening and redirecting. A closed port is a smaller attack surface, but visitors typing http:// get a connection error instead of a redirect. |
 | `waf_bypass_paths` | list | _(empty)_ | Requests matching these URI patterns skip Coraza/CRS inspection entirely — for webhook and upload endpoints that must receive raw bytes. Everything else stays protected. |
-| `max_header_size_kb` | number (1–1024) | `0` | 0 leaves Caddy at its built-in default. |
+| `max_header_size_kb` | number (0–1024) | `0` | 0 leaves Caddy at its built-in default. |
 | `max_body_size_mb` | number (0–10240) | `0` | 0 leaves the limit unset. Applies at the HTTP layer, before the WAF body limit. |
 | `file_cache_size` | number (0–100000) | `0` | Only relevant when CatWAF serves files directly (static or PHP-FPM origin). 0 disables the cache. |
 
@@ -452,6 +454,7 @@ Make ambiguous visitors prove they are a browser before passing them through.
 | `site_key` | str | _(unset)_ | Provider site key |
 | `secret_key` | str | _(secret)_ | Provider secret key |
 | `provider_verify_url` | str | _(unset)_ | Provider verify URL (mCaptcha/self-hosted) |
+| `provider_hostnames` | list | _(empty)_ | Provider hostnames (empty uses the request hostname) |
 | `valid_minutes` | number (1–10080) | `1440` | Solved challenge stays valid for (minutes) |
 | `resolve_seconds` | number (10–3600) | `300` | Time allowed to solve (seconds) |
 | `trigger` | choice: `all`, `suspicious`, `countries` | `suspicious` | "suspicious" challenges only visitors already flagged by another signal (greylist, DNSBL, bad behaviour). |
@@ -463,6 +466,16 @@ Make ambiguous visitors prove they are a browser before passing them through.
 | `exempt_user_agents` | list | _(empty)_ | Exempt user agents |
 | `captcha_length` | number (4–8) | `5` | Generated captcha length |
 | `max_attempts` | number (1–20) | `5` | Attempts before the visitor is banned |
+
+## ban_enforcement
+
+**Runtime bans**
+
+Check the local ban store on every request. Enabled automatically when an administrator adds a ban; requires the backend to be available.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | switch | `false` | Enforce runtime bans |
 
 ## bad_behavior
 
@@ -634,9 +647,9 @@ Opt in to exchanging anonymised attacker signals with other CatWAF instances.
 
 ## threat_feed
 
-**Local threat feed** · contains secrets
+**CrowdSec bouncer** · contains secrets
 
-Consult a host-local behavioural daemon (CrowdSec-style bouncer API).
+Enforce CrowdSec Local API IP/range bans and CAPTCHA decisions, with bounded caching and configurable outage policy.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
@@ -736,19 +749,35 @@ Continuously apply configuration derived from container labels.
 | `enabled` | switch | `false` | Strictly opt-in: this applies configuration changes without a human confirming them. Containers without the label prefix keep the existing suggest-only behaviour. |
 | `label_prefix` | str | `catwaf` | Label prefix |
 | `interval_sec` | number (30–86400) | `300` | Scan interval (seconds) |
+| `network` | str | _(unset)_ | Network shared with the proxy (optional when labelled) |
 | `require_enable_label` | switch | `true` | Require an explicit catwaf.enable=true label |
 | `remove_orphans` | switch | `false` | Remove routes for containers that disappeared |
 | `dry_run` | switch | `false` | Log what would change without applying it |
+
+## kubernetes
+
+**Kubernetes ingress**
+
+Reconcile explicitly selected networking.k8s.io/v1 Ingress resources using a namespace-scoped service account.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | switch | `false` | Enabled |
+| `namespace` | str | `default` | Namespace |
+| `ingress_class` | str | `catwaf` | IngressClass name |
+| `controller` | str | `catwaf.com/ingress-controller` | IngressClass controller |
+| `interval_sec` | number (5–3600) | `15` | Reconcile interval (seconds) |
+| `dry_run` | switch | `false` | Preview without applying |
 
 ## sites
 
 **Protected sites**
 
-CatWAF Free protects one site. The registry exists so features stay single-site-safe as they grow.
+Host registry and an explicit capacity limit for automatically managed sites.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `max_sites` | number (1–1) | `1` | Maximum protected sites |
+| `max_sites` | number (1–1000) | `1` | Maximum protected sites |
 | `primary_host` | str | _(unset)_ | Primary hostname |
 | `aliases` | list | _(empty)_ | Additional hostnames for the same site |
 
@@ -866,4 +895,4 @@ Actually send the alerts configured on the Alerts page: attack spikes, new bans 
 
 ---
 
-46 groups, 326 settings.
+48 groups, 335 settings.

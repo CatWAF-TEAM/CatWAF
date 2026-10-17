@@ -178,6 +178,7 @@ async function waitForHttp(url, attempts = 60, delayMs = 250) {
       ['/config/advanced', /advanced|raw|plugin/i],
 
       ['/system/jobs', /job|schedul|interval/i],
+      ['/system/orchestration', /Docker.*Kubernetes|Kubernetes.*ingress/i],
       ['/system/caches', /cache|entries|clear/i],
       ['/system/templates', /template|configuration|apply/i],
       ['/system/reports', /report|export|range|request/i],

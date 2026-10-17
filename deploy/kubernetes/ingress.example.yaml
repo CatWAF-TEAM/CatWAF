@@ -1,0 +1,23 @@
+# The app Service and its Pods must already exist in the catwaf namespace.
+# Do not expose the origin via another public Service or hostPort.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  namespace: catwaf
+spec:
+  ingressClassName: catwaf
+  # Supply an existing same-namespace TLS Secret before uncommenting:
+  # tls:
+  #   - hosts: [app.example.com]
+  #     secretName: app-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app
+                port: {number: 3000}

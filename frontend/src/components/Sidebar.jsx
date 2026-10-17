@@ -52,6 +52,7 @@ export const NAV = [
     { path: '/settings', icon: Settings,  label: 'Settings' },
     { path: '/alerts',   icon: Bell,      label: 'Alerts' },
     { path: '/system/jobs',      icon: Clock,          label: 'Scheduled Jobs' },
+    { path: '/system/orchestration', icon: Network,    label: 'Docker & Kubernetes' },
     { path: '/system/caches',    icon: Database,       label: 'Caches' },
     { path: '/system/templates', icon: LayoutTemplate, label: 'Templates' },
     { path: '/system/reports',   icon: FileBarChart,   label: 'Reports' },

@@ -30,8 +30,8 @@ const TLS_PROFILES = {
       'TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256',
       'TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384',
       'TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384',
-      'TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305',
-      'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305',
+      'TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256',
+      'TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256',
     ],
     curves: ['x25519', 'secp256r1', 'secp384r1'],
   },
@@ -55,6 +55,8 @@ function ctxOf(overrides = {}) {
     tlsCapable: overrides.tlsCapable !== false,
     backend: overrides.backend || null,
     waf: overrides.waf || null,
+    managedRoutes: !!overrides.managedRoutes,
+    assetPrefix: overrides.assetPrefix || '',
   }
 }
 
@@ -559,10 +561,10 @@ function tls(ctx, out) {
       out.skipped.push({ feature: 'tls', reason: 'Certificate source is "custom" but the certificate or key is missing.' })
       return
     }
-    const cert = writeAsset('certs/site-cert.pem', t.custom_cert_pem, { mode: 0o640 })
+    const cert = writeAsset('certs/' + ctx.assetPrefix + 'site-cert.pem', t.custom_cert_pem, { mode: 0o640 })
     // Caddy runs separately and reads generated files through the restricted
     // shared group. The database itself remains owner-only.
-    const key = writeAsset('certs/site-key.pem', t.custom_key_pem, { mode: 0o640 })
+    const key = writeAsset('certs/' + ctx.assetPrefix + 'site-key.pem', t.custom_key_pem, { mode: 0o640 })
     args = ` ${q(cert)} ${q(key)}`
   } else if (t.acme_email) {
     args = ` ${q(t.acme_email)}`
@@ -640,6 +642,7 @@ function tls(ctx, out) {
 
 // ─── #26-#31, #60 reverse proxy behaviour ───────────────────────────────
 function proxyBehaviour(ctx, out) {
+  if (ctx.managedRoutes) return
   const p = ctx.get('proxy')
   const origin = ctx.get('origin')
   if (origin.type !== 'reverse-proxy') return

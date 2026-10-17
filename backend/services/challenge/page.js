@@ -47,7 +47,7 @@ button:hover { background:#3d7ce0 }
 }
 `
 
-function build({ mode, provider, siteKey, token, returnTo, error, captchaSvg, challengeId }) {
+function build({ mode, provider, siteKey, providerUrl, token, returnTo, error, captchaSvg, challengeId }) {
   const spec = provider && provider !== 'none' ? providers.get(provider) : null
   const action = '/catwaf-challenge/verify'
 
@@ -101,6 +101,21 @@ function build({ mode, provider, siteKey, token, returnTo, error, captchaSvg, ch
         <input type="hidden" name="token" value="${escapeHtml(token)}">
         <button type="submit">Continue</button>
       </form>`
+  } else if (mode === 'provider' && provider === 'mcaptcha' && providerUrl) {
+    let widget
+    try { widget = new URL('/widget/', providerUrl); widget.searchParams.set('sitekey', siteKey) } catch {}
+    if (!widget || !['http:', 'https:'].includes(widget.protocol)) {
+      bodyInner = '<p>The CAPTCHA provider is not configured. Contact the site administrator.</p>'
+    } else {
+      bodyInner = `<p>Complete the check below to continue.</p>
+        <form method="POST" action="${action}">
+        <iframe id="mcaptcha-frame" title="mCaptcha verification" src="${escapeHtml(widget.href)}" style="border:0;width:100%;height:120px" sandbox="allow-scripts allow-same-origin"></iframe>
+        <input type="hidden" name="mcaptcha__token" id="mcaptcha-token">
+        <input type="hidden" name="challenge_id" value="${escapeHtml(challengeId)}">
+        <input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">
+        <button type="submit">Continue</button></form>`
+      script = `<script>window.addEventListener('message',function(e){var f=document.getElementById('mcaptcha-frame');if(e.source!==f.contentWindow||e.origin!==new URL(f.src).origin||!e.data||typeof e.data.token!=='string'||e.data.token.length>4096)return;document.getElementById('mcaptcha-token').value=e.data.token;});</script>`
+    }
   } else {
     bodyInner = `
       <p>Complete the check below to continue.</p>
