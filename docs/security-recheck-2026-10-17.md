@@ -1,6 +1,6 @@
 # Node.js security and reliability recheck — 2026-10-17
 
-**Release remains blocked.** CatWAF is still a Node.js application with its original upstream Caddy/Coraza integration. No Go source, local Go module graph or custom runtime patches are included. This report records the pre-publication validation snapshot; publishing the security branch does not mean the release gates passed or that the patchset was deployed.
+**Release remains blocked.** CatWAF is still a Node.js application with its original upstream Caddy/Coraza integration. No Go source, local Go module graph or custom runtime patches are included. This report records the 1.0.2 security-update validation snapshot; publishing the patchset does not mean the release gates passed or that the patchset was deployed.
 
 ## Patches in this pass
 

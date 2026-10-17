@@ -9,6 +9,14 @@ public release. Those entries are preserved below under the release they belong 
 numbers themselves were retired, not the history. Nothing here has been deleted or
 rewritten, only re-filed.
 
+**1.0.2 security update — 2026-10-17.** This update hardens configuration and
+database rollback, backup restore, authentication, API contracts, audit rotation,
+and the Node.js control plane without adding Go application code. The
+[security recheck](docs/security-recheck-2026-10-17.md) records the test evidence.
+Release validation remains blocked by reload connection resets, an audit record
+lost across rotations, and an unsuppressed upstream Go module advisory. These
+checks remain enabled; this update is not a clean release-gate result.
+
 ## [Unreleased] — 2026-08-24 — Edge enforcement & alert delivery
 
 ### New: edge ban enforcement
