@@ -15,6 +15,7 @@ const crypto = require('crypto')
 
 const db = require('./db')
 const secrets = require('./secrets')
+const { withConfigLock } = require('./configLock')
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 const STORE_KEY = 'totp'
@@ -106,7 +107,7 @@ function encryptionKey() {
 
 function seal(plaintext) {
   const iv = crypto.randomBytes(12)
-  const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey(), iv)
+  const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey(), iv, { authTagLength: 16 })
   const enc = Buffer.concat([cipher.update(String(plaintext), 'utf8'), cipher.final()])
   return `${iv.toString('base64')}.${cipher.getAuthTag().toString('base64')}.${enc.toString('base64')}`
 }
@@ -114,14 +115,19 @@ function seal(plaintext) {
 function unseal(sealed) {
   const [ivB64, tagB64, dataB64] = String(sealed || '').split('.')
   if (!ivB64 || !tagB64 || !dataB64) throw new Error('Stored value is not in the expected format')
-  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(), Buffer.from(ivB64, 'base64'))
+  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(), Buffer.from(ivB64, 'base64'), { authTagLength: 16 })
   decipher.setAuthTag(Buffer.from(tagB64, 'base64'))
   return Buffer.concat([decipher.update(Buffer.from(dataB64, 'base64')), decipher.final()]).toString('utf8')
 }
 
 function loadStore() {
-  const stored = db.getState(STORE_KEY)
-  return stored && typeof stored === 'object' ? stored : {}
+  const stored = db.getStateStrict(STORE_KEY)
+  if (stored === null) return Object.create(null)
+  if (typeof stored !== 'object' || Array.isArray(stored)) throw new Error('Invalid second-factor store')
+  for (const entry of Object.values(stored)) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.enabled !== 'boolean' || typeof entry.secret !== 'string' || !Array.isArray(entry.recovery)) throw new Error('Invalid second-factor record')
+  }
+  return Object.assign(Object.create(null), stored)
 }
 
 function saveStore(store) { db.setState(STORE_KEY, store) }
@@ -163,6 +169,7 @@ function status(username) {
 function beginEnrollment(username, { issuer = 'CatWAF', account = null } = {}) {
   const secret = base32Encode(crypto.randomBytes(20))
   const store = loadStore()
+  if (store[username]?.enabled) throw new Error('Two-factor authentication is already enabled')
   store[username] = {
     secret: seal(secret),
     enabled: false,
@@ -260,7 +267,8 @@ function anyEnabled() {
 }
 
 module.exports = {
-  beginEnrollment, confirmEnrollment, verify, disable, status, isEnabled, anyEnabled,
-  regenerateRecoveryCodes, totp, hotp, verifyCode, base32Encode, base32Decode,
+  ...Object.fromEntries(Object.entries({ beginEnrollment, confirmEnrollment, verify, disable, regenerateRecoveryCodes })
+    .map(([name, fn]) => [name, (...args) => withConfigLock(() => fn(...args))])),
+  status, isEnabled, anyEnabled, totp, hotp, verifyCode, base32Encode, base32Decode,
   DIGITS, PERIOD, STORE_KEY,
 }

@@ -1,0 +1,92 @@
+name: Security validation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CATWAF_SKIP_CADDY_DOWNLOAD: '1'
+      COMPOSE_PROJECT_NAME: catwaf-security-check
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          npm ci --ignore-scripts
+          npm --prefix frontend ci --ignore-scripts
+      - name: Audit JavaScript dependencies
+        run: |
+          npm audit --audit-level=low
+          npm --prefix frontend audit --audit-level=low
+      - name: Obtain the existing upstream proxy dependency
+        run: |
+          mkdir -p "$RUNNER_TEMP/catwaf-caddy"
+          docker build --target caddy-build -t catwaf-proxy-dependency .
+          container=$(docker create catwaf-proxy-dependency)
+          docker cp "$container:/usr/bin/caddy" "$RUNNER_TEMP/catwaf-caddy/caddy"
+          docker rm "$container"
+          echo "$RUNNER_TEMP/catwaf-caddy" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/catwaf-caddy/caddy" list-modules | grep -q http.handlers.waf
+      - name: Build dashboard
+        run: npm run build
+      - name: Backend and live WAF suites
+        run: npm test
+      - name: Real filesystem exhaustion and crash recovery
+        if: ${{ !cancelled() }}
+        run: sudo env PATH="$PATH" CATWAF_TEST_USER="$(id -un)" bash scripts/check-filesystem-reliability.sh
+      - name: Mixed protocol load with strict zero-loss checks
+        if: ${{ !cancelled() }}
+        run: npm run test:reliability:load
+      - name: Browser tests
+        run: |
+          mkdir -p "$RUNNER_TEMP/browser-tests"
+          npm install --prefix "$RUNNER_TEMP/browser-tests" --no-save playwright
+          "$RUNNER_TEMP/browser-tests/node_modules/.bin/playwright" install --with-deps chromium
+          export PLAYWRIGHT_CORE="$RUNNER_TEMP/browser-tests/node_modules/playwright-core"
+          node test/frontend-smoke.test.js
+          node test/auth-flow.test.js
+      - name: Build container stack
+        run: |
+          cp .env.example .env
+          printf '\nJWT_SECRET=%s\n' "$(openssl rand -hex 32)" >> .env
+          docker compose config --quiet
+          docker compose build
+      - name: Check live container isolation and WAF
+        run: |
+          docker compose up -d
+          node scripts/check-container-isolation.js
+      - name: Test disposable stack recovery and certificate persistence
+        env:
+          CATWAF_TEST_IMAGE_PREFIX: catwaf-security-check
+        run: node scripts/check-container-reliability.js
+      - name: Scan container OS and packaged dependencies
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy"
+          cd "$RUNNER_TEMP/trivy"
+          curl --fail --location --retry 3 -o trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.76.0/trivy_0.76.0_Linux-64bit.tar.gz
+          echo 'e24b1c51293c1b15e4ba8d45bbc7891ba053f90278ec2698f3562c993e145fe7  trivy.tar.gz' | sha256sum -c -
+          tar -xzf trivy.tar.gz trivy
+          ./trivy config --exit-code 1 "$GITHUB_WORKSPACE"
+          for service in backend caddy test-app; do
+            ./trivy image --scanners vuln --format json --output "$service.json" "catwaf-security-check-$service"
+            node "$GITHUB_WORKSPACE/scripts/check-image-findings.js" "$service.json"
+          done
+          cd "$GITHUB_WORKSPACE"
+          bash scripts/check-discovery-fixtures.sh
+          for image in booknook-apache booknook-php fake-web-php catwaf-fixture-nginx catwaf-fixture-database; do
+            "$RUNNER_TEMP/trivy/trivy" image --scanners vuln --exit-code 1 "$image"
+          done
+      - name: Stop CI containers
+        if: always()
+        run: docker compose down

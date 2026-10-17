@@ -7,8 +7,9 @@
 // them, so a download cannot be verified against upstream the way a release
 // artifact can. What this script does instead, in order of strength:
 //
-//   1. Pins a version. The request includes &version=<pin>, so the build is
-//      reproducible per release instead of floating to whatever is latest.
+//   1. Pin Caddy and Coraza versions and inspect the received binary's
+//      compiler/dependency security baseline before installation.
+//      Upstream downloads do not lock all transitive dependencies.
 //   2. Never follows redirects off the download host.
 //   3. Trust-on-first-use pinning: after a successful install the binary's
 //      SHA-256 is recorded in data/caddy-pin.json. Every later reinstall of
@@ -31,9 +32,10 @@ const LOCAL_BIN_DIR = path.join(PROJECT_ROOT, 'bin', 'vendor')
 const LOCAL_CADDY = path.join(LOCAL_BIN_DIR, 'caddy')
 const PIN_FILE = path.join(PROJECT_ROOT, 'data', 'caddy-pin.json')
 const DOWNLOAD_HOST = 'caddyserver.com'
-// Pinned Coraza-caddy line; override with CATWAF_CADDY_VERSION if you know
-// a newer one is right for you.
-const CADDY_VERSION = process.env.CATWAF_CADDY_VERSION || ''
+// Security updates to the existing upstream proxy dependency.
+const CADDY_VERSION = 'v2.11.7'
+const CORAZA_CADDY_VERSION = 'v2.6.2'
+const MAX_DOWNLOAD_BYTES = 160 * 1024 * 1024
 
 function log(msg) { console.log(`[ensure-caddy] ${msg}`) }
 
@@ -42,8 +44,26 @@ function sha256(buf) { return crypto.createHash('sha256').update(buf).digest('he
 function hasWorkingCoraza(bin) {
   try {
     const out = execFileSync(bin, ['list-modules'], { timeout: 5000 }).toString()
-    return out.includes('http.handlers.waf')
+    return out.includes('http.handlers.waf') && meetsSecurityBaseline(execFileSync(bin, ['build-info'], { timeout: 5000, encoding: 'utf8' }))
   } catch { return false }
+}
+
+function atLeast(value, required) {
+  const match = /^(?:go|v)?(\d+)\.(\d+)\.(\d+)$/.exec(value || '')
+  if (!match) return false
+  const parts = match.slice(1).map(Number)
+  for (let i = 0; i < 3; i++) {
+    if (parts[i] !== required[i]) return parts[i] > required[i]
+  }
+  return true
+}
+function meetsSecurityBaseline(info) {
+  const rows = info.split('\n').map(line => line.trim().split(/\s+/))
+  const moduleVersion = name => rows.find(row => row[0] === 'dep' && row[1] === name)?.[2]
+  return atLeast(rows.find(row => row[0] === 'go')?.[1], [1, 26, 9]) &&
+    atLeast(moduleVersion('github.com/caddyserver/caddy/v2'), [2, 11, 7]) &&
+    atLeast(moduleVersion('github.com/corazawaf/coraza-caddy/v2'), [2, 6, 2]) &&
+    atLeast(moduleVersion('golang.org/x/net'), [0, 60, 0])
 }
 
 function findExistingCaddy() {
@@ -65,11 +85,11 @@ function platformTarget() {
 // another origin would silently change who we are trusting.
 function download(url, redirects = 5) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'catwaf-setup' } }, (res) => {
+    const request = https.get(url, { headers: { 'User-Agent': 'catwaf-setup' }, signal: AbortSignal.timeout(120000) }, (res) => {
       if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
         res.resume()
         const next = new URL(res.headers.location, url)
-        if (next.host !== DOWNLOAD_HOST) {
+        if (next.protocol !== 'https:' || next.host !== DOWNLOAD_HOST || next.username || next.password) {
           return reject(new Error(`Download redirected off ${DOWNLOAD_HOST} (to ${next.host}) — refusing.`))
         }
         return resolve(download(next.toString(), redirects - 1))
@@ -79,7 +99,12 @@ function download(url, redirects = 5) {
         return reject(new Error(`HTTP ${res.statusCode} fetching ${url}`))
       }
       const chunks = []
-      res.on('data', (c) => chunks.push(c))
+      let size = 0
+      res.on('data', (c) => {
+        size += c.length
+        if (size > MAX_DOWNLOAD_BYTES) { request.destroy(new Error('Caddy download exceeds size limit')); return }
+        chunks.push(c)
+      })
       res.on('end', () => resolve(Buffer.concat(chunks)))
       res.on('error', reject)
     }).on('error', reject)
@@ -87,12 +112,12 @@ function download(url, redirects = 5) {
 }
 
 async function fetchCaddyWithCoraza(target) {
-  let url = `https://${DOWNLOAD_HOST}/api/download?os=${target.os}&arch=${target.arch}&p=github.com%2Fcorazawaf%2Fcoraza-caddy%2Fv2`
+  let url = `https://${DOWNLOAD_HOST}/api/download?os=${target.os}&arch=${target.arch}&p=${encodeURIComponent('github.com/corazawaf/coraza-caddy/v2@' + CORAZA_CADDY_VERSION)}`
   if (CADDY_VERSION) url += `&version=${encodeURIComponent(CADDY_VERSION)}`
   log(`Downloading a Caddy${CADDY_VERSION ? ` ${CADDY_VERSION}` : ''} build with the Coraza module for ${target.os}/${target.arch}…`)
   const body = await download(url)
   const isGzip = body[0] === 0x1f && body[1] === 0x8b
-  return isGzip ? zlib.gunzipSync(body) : body
+  return isGzip ? zlib.gunzipSync(body, { maxOutputLength: 256 * 1024 * 1024 }) : body
 }
 
 // A substituted payload is usually not even a valid executable for this
@@ -124,8 +149,12 @@ function writePin(pin) {
 function checkPin(bytes, target) {
   const key = `${target.os}-${target.arch}`
   const hash = sha256(bytes)
+  const expected = process.env.CATWAF_CADDY_SHA256
+  if (expected && (!/^[a-f0-9]{64}$/i.test(expected) || expected.toLowerCase() !== hash)) {
+    return { ok: false, error: 'The downloaded build does not match CATWAF_CADDY_SHA256.' }
+  }
   const pin = readPin()
-  if (!pin || pin.target !== key || !pin.sha256) {
+  if (!pin || pin.target !== key || pin.version !== CADDY_VERSION || !pin.sha256) {
     return { ok: true, hash, tofu: true }
   }
   if (pin.sha256 === hash) return { ok: true, hash, tofu: false }
@@ -144,7 +173,7 @@ function installTo(dir, bytes) {
   const dest = path.join(dir, 'caddy')
   // Atomic replace: never leave a truncated binary at the target path.
   const tmp = `${dest}.tmp-${process.pid}`
-  fs.writeFileSync(tmp, bytes, { mode: 0o755 })
+  fs.writeFileSync(tmp, bytes, { mode: 0o755, flag: 'wx' })
   fs.renameSync(tmp, dest)
   return dest
 }
@@ -162,7 +191,7 @@ async function main() {
   const target = platformTarget()
   if (!target) {
     log(`Unsupported platform (${os.platform()}/${os.arch()}) for automatic install.`)
-    log('Build Caddy with Coraza yourself: xcaddy build --with github.com/corazawaf/coraza-caddy/v2')
+    log('Use the existing Docker integration or install an upstream Caddy build with Coraza.')
     log('(see docs/installation.md) — `catwaf --setup` will tell you if it\'s still missing.')
     return
   }
@@ -175,30 +204,38 @@ async function main() {
     const pinCheck = checkPin(bytes, target)
     if (!pinCheck.ok) throw new Error(pinCheck.error)
 
+    // Validate before replacing any installed binary. A rejected download
+    // must never become the executable selected on the next service start.
+    const checkDir = fs.mkdtempSync(path.join(os.tmpdir(), 'catwaf-caddy-check-'))
+    try {
+      const candidate = installTo(checkDir, bytes)
+      if (!hasWorkingCoraza(candidate)) throw new Error('Upstream Caddy build fails the security baseline (Go >= 1.26.9, Caddy >= 2.11.7, Coraza-Caddy >= 2.6.2, x/net >= 0.60.0). Use the pinned Docker integration or a verified upstream build.')
+    } finally { fs.rmSync(checkDir, { recursive: true, force: true }) }
     const dest = canWriteSystemBin()
       ? installTo('/usr/local/bin', bytes)
       : installTo(LOCAL_BIN_DIR, bytes)
 
     if (!hasWorkingCoraza(dest)) {
       log(`Downloaded a binary to ${dest} but it doesn't report the Coraza module — treating this as a failed install.`)
-      log('Build it yourself: xcaddy build --with github.com/corazawaf/coraza-caddy/v2 (see docs/installation.md).')
+      log('Use the pinned Docker integration or a verified upstream build (see docs/installation.md).')
       return
     }
 
     writePin({ target: `${target.os}-${target.arch}`, sha256: pinCheck.hash, recordedAt: new Date().toISOString(), version: CADDY_VERSION || null })
     log(`✓ Installed Caddy (with Coraza) to ${dest}`)
     log(`  Build SHA-256 pinned locally: ${pinCheck.hash}`)
-    log(`  NOTE: this build service publishes no checksums — the pin above is trust-on-first-use.`)
-    log(`  Verify it independently if this server matters: xcaddy build + sha256sum comparison.`)
+    log('  Upstream build accepted with a local trust-on-first-use hash; upstream publishes no signed checksums.')
     if (dest === LOCAL_CADDY) {
       log(`/usr/local/bin isn't writable without root — add ${LOCAL_BIN_DIR} to PATH,`)
       log('or re-run this install with sudo/root to install it system-wide instead.')
     }
   } catch (e) {
     log(`Could not auto-install Caddy: ${e.message}`)
-    log('This is not fatal — `catwaf --setup` will flag it and you can install Caddy manually:')
-    log('  xcaddy build --with github.com/corazawaf/coraza-caddy/v2   (see docs/installation.md)')
+    process.exitCode = 1
+    log('Caddy was not installed; the setup checks will report it as unavailable:')
+    log('  use the pinned Docker integration or a verified upstream build (see docs/installation.md)')
   }
 }
 
-main().catch((e) => { log(`Unexpected error: ${e.message}`); process.exitCode = 0 })
+if (require.main === module) main().catch((e) => { log(`Unexpected error: ${e.message}`); process.exitCode = 1 })
+module.exports = { atLeast, meetsSecurityBaseline, hasWorkingCoraza }

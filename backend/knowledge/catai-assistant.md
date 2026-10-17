@@ -27,7 +27,7 @@ Some things aren't in its toolbox at all — not hidden behind a confirmation, j
 
 ## Privacy
 
-CatAI runs entirely on this machine via Ollama. Your questions, your settings, and your traffic data never leave the server — there's no cloud API involved.
+By default CatAI talks to Ollama at `http://127.0.0.1:11434`. Prompts can include your question, selected settings and sanitized recent log fields. If an administrator sets `OLLAMA_URL` to another host, that host receives the prompts. Use only an endpoint and network path you trust. The initial model download also needs network access.
 
 ## Memory
 

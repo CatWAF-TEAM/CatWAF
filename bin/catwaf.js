@@ -1237,6 +1237,15 @@ async function main() {
   const refused = refuseIfLite(command)
   if (refused !== null) return refused
 
+  // Recover an interrupted configuration activation before any CLI command
+  // can mutate state. Read-only help/version do not need a database.
+  if (!['help', 'version', 'edition', 'stop', 'logs'].includes(command)) {
+    require(path.join(PROJECT_ROOT, 'backend', 'services', 'configTx.js')).recover()
+  }
+  if (['start', 'restart', 'setup', 'install', 'auto'].includes(command)) {
+    require(path.join(PROJECT_ROOT, 'backend', 'services', 'configTx.js')).assertReady()
+  }
+
   switch (command) {
     case 'help': printHelp(rest[0]); return 0
     case 'version': console.log(pkg.version); return 0

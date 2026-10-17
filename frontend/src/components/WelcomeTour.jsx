@@ -310,7 +310,7 @@ export default function WelcomeTour({ onDone }) {
 
         <div style={{ padding:'0 16px 14px', display:'flex', gap:8 }}>
           <button onClick={prev} disabled={step===0}
-            style={{ flex:1, padding:'8px 0', borderRadius:8, background:'var(--cat-muted)', border:'none', color:'var(--cat-sub)', fontSize:12, cursor:step===0?'not-allowed':'pointer', opacity:step===0?.4:1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, transition:'all .15s', fontWeight:500 }}>
+            style={{ flex:1, padding:'8px 0', borderRadius:8, background:'var(--cat-muted)', border:'none', color:'var(--cat-sub)', fontSize:12, cursor:step===0?'not-allowed':'pointer', opacity: step === 0 ? 0.4 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:5, transition:'all .15s', fontWeight:500 }}>
             <ChevronLeft size={13}/> Back
           </button>
           <button onClick={next}

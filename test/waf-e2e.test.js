@@ -148,7 +148,8 @@ process.on('SIGINT', () => { cleanup(); process.exit(130) })
   check('response really came from the test app', normal.body.includes('CATWAF SECURITY TEST ENVIRONMENT'))
 
   section('malicious traffic is blocked by Coraza')
-  const sqli = await get(`http://127.0.0.1:${WAF_PORT}/?id=1+UNION+SELECT+1,2,3--`)
+  const secret = 'audit-privacy-test-secret-1234567890'
+  const sqli = await get(`http://127.0.0.1:${WAF_PORT}/?id=1+UNION+SELECT+1,2,3--`, { Authorization: 'Bearer ' + secret, Cookie: 'session=' + secret })
   check('SQL injection pattern is blocked with 403', sqli.status === 403, sqli.status)
   check('blocked response did NOT reach the app', !sqli.body.includes('CATWAF SECURITY TEST ENVIRONMENT'))
 
@@ -185,11 +186,9 @@ process.on('SIGINT', () => { cleanup(); process.exit(130) })
     check('SQLi row records client ip', !!sqliRow.ip, sqliRow.ip)
   }
 
-  const scannerRow = rows.find(r => (r.user_agent || '').includes('sqlmap'))
-  check('scanner event captured with its user-agent', !!scannerRow, scannerRow && scannerRow.user_agent)
-  if (scannerRow) {
-    check('scanner event classified as Scanner Detection', scannerRow.attack_type === 'Scanner Detection', scannerRow.attack_type)
-  }
+  const scannerRow = rows.find(r => r.attack_type === 'Scanner Detection')
+  check('scanner event classified without retaining request headers', !!scannerRow)
+  check('raw user-agent headers are omitted from ingested audit rows', rows.every(r => !r.user_agent))
 
   section('time-window aggregation sees the events')
   const counts = requestLog.getCounts(24 * 60 * 60 * 1000)
@@ -204,6 +203,7 @@ process.on('SIGINT', () => { cleanup(); process.exit(130) })
   check('request_log stores no header/body/secret columns', leaked.length === 0, leaked)
   const serialized = JSON.stringify(rows)
   check('no Authorization value present in stored rows', !/Bearer\s+[A-Za-z0-9._-]{10,}/.test(serialized))
+  check('request secrets absent from both raw audit log and database', !serialized.includes(secret) && !fs.readFileSync(AUDIT_LOG, 'utf8').includes(secret))
 
   section('reload works without Docker')
   const reload = caddySvc.reloadCaddy()

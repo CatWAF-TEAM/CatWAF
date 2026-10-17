@@ -29,7 +29,7 @@ function EnforcementStatusCard() {
 
   return (
     <div className="card">
-      <div className="section-title">Edge & kernel enforcement</div>
+      <div className="section-title">Edge &amp; kernel enforcement</div>
       <div className="flex flex-wrap gap-1.5 items-center">
         {status.ddos?.emergency
           ? <Badge color="red">UNDER-ATTACK MODE ON</Badge>

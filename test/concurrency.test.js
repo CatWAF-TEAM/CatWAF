@@ -75,6 +75,9 @@ function runChild(mode, tag, count) {
   {
     const logPath = path.join(process.env.DB_DIR, 'shared.log')
     const CHILDREN = 5, PER_CHILD = 12
+    // All waiters must recover the same dead holder without unlinking a
+    // newly acquired lock belonging to another waiter.
+    fs.writeFileSync(configLock.LOCK_PATH, JSON.stringify({ pid: 99999999, id: 'dead-racing-holder', at: 0 }))
     const codes = await Promise.all(
       Array.from({ length: CHILDREN }, (_, i) => runChild('lockfile', i + 1, PER_CHILD)),
     )

@@ -23,6 +23,13 @@ function redactSecrets(value, keyPath = '') {
     }
     return out
   }
+  // A credential-bearing URL is a secret even if its field is named "url".
+  if (typeof value === 'string' && /^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+    try {
+      const url = new URL(value)
+      if (url.username || url.password) { url.username = ''; url.password = ''; return url.toString() }
+    } catch { /* preserve non-URL text */ }
+  }
   return value
 }
 

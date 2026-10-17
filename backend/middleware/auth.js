@@ -13,8 +13,15 @@ const db = require('../services/db')
 const DEFAULT_USERS = []
 
 function loadUsers() {
-  const stored = db.getState('users')
-  return (stored && stored.length) ? stored : DEFAULT_USERS
+  const stored = db.getStateStrict('users')
+  if (stored === null) {
+    if (db.getStateStrict('auth_initialized')) throw new Error('Account store is missing')
+    return DEFAULT_USERS
+  }
+  if (!Array.isArray(stored) || !stored.length || stored.some(u => !u || typeof u.id !== 'string' || typeof u.username !== 'string' || typeof u.password_hash !== 'string' || !['admin', 'viewer'].includes(u.role))) {
+    throw new Error('Account store is invalid')
+  }
+  return stored
 }
 
 // The account list was read once at module load and never again, so it went
@@ -24,37 +31,30 @@ function loadUsers() {
 // `catwaf user remove` did not affect the running API at all, which matters
 // because those are the commands an operator reaches for to revoke access.
 //
-// Reads revalidate against SQLite at most once a second. That is one small
-// indexed read per second on the authenticated path — every request already
-// does a bcrypt compare or a JWT verify — and it bounds staleness to a second
-// across every process instead of leaving it unbounded.
+// CLI/list reads are cached for at most a second. Authentication and the
+// post-password-comparison check force a fresh SQLite read so resets and role
+// changes from another process take effect at the next authentication check.
 const USER_REVALIDATE_MS = 1000
 let _usersReadAt = 0
 
-function refreshUsers() {
+function refreshUsers(force = false) {
   const now = Date.now()
-  if (now - _usersReadAt < USER_REVALIDATE_MS) return
-  _usersReadAt = now
-  let fresh
-  try { fresh = loadUsers() } catch { return }
-  // A populated account store never legitimately becomes empty: removeUser()
-  // refuses to delete the last admin. So an empty read on a store that had
-  // accounts is a fault — a missing or unparseable `users` row, which
-  // db.getState() reports as null rather than throwing — and NOT a signal to
-  // believe there are no accounts. Believing it would be serious:
-  // needsBootstrap() would turn true and re-open POST /api/setup/account,
-  // which is unauthenticated and creates an admin. Keep what we had.
-  if (_users.length && !fresh.length) return
+  if (!force && now - _usersReadAt < USER_REVALIDATE_MS) return
+  const fresh = loadUsers()
+  // loadUsers fails closed on missing or damaged initialized account state.
   _users = fresh
+  _usersReadAt = now
 }
 
 function needsBootstrap() { refreshUsers(); return _users.length === 0 }
 function saveUsers(users) {
   db.setState('users', users)
+  db.setState('auth_initialized', true)
   _usersReadAt = Date.now()
 }
 
 let _users = loadUsers()
+if (_users.length) db.setState('auth_initialized', true)
 const USERS = new Proxy([], {
   get(_, prop) { refreshUsers(); return Reflect.get(_users, prop, _users) },
   set(_, prop, value) { return Reflect.set(_users, prop, value, _users) },
@@ -73,13 +73,15 @@ const MIN_PASSWORD_LENGTH = 8
 // Every mutator re-reads the committed user list inside the lock: a
 // `catwaf user add` in the CLI and a dashboard role change can no longer
 // whole-blob-overwrite each other.
-function addUser({ username, password, role = 'viewer' }) {
+function addUser({ username, password, role = 'viewer', bootstrap = false }) {
   return configLock.withConfigLock(() => {
   _usersReadAt = 0 // force the freshest read inside the lock
   refreshUsers()
+  if (bootstrap && _users.length) throw new Error('Setup has already completed')
+  if (typeof username !== 'string' || !/^[A-Za-z0-9._-]{2,32}$/.test(username) || ['__proto__', 'constructor', 'prototype', 'guest'].includes(username)) throw new Error('Invalid or reserved username')
   if (_users.find(u => u.username === username)) throw new Error(`User "${username}" already exists`)
   if (!VALID_ROLES.includes(role)) throw new Error(`Role must be one of: ${VALID_ROLES.join(', ')}`)
-  if (!password || password.length < MIN_PASSWORD_LENGTH) throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+  validatePassword(password)
   const user = { id: 'u_' + crypto.randomBytes(6).toString('hex'), username, password_hash: bcrypt.hashSync(password, BCRYPT_COST), role, created_at: new Date().toISOString() }
   _users = [..._users, user]
   saveUsers(_users)
@@ -92,7 +94,7 @@ function setPassword(username, password) {
   refreshUsers()
   const u = _users.find(x => x.username === username)
   if (!u) throw new Error(`User "${username}" not found`)
-  if (!password || password.length < MIN_PASSWORD_LENGTH) throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+  validatePassword(password)
   u.password_hash = bcrypt.hashSync(password, BCRYPT_COST)
   // Every token issued up to and including this second is dead: softAuth
   // compares with <=, and routes/auth.js refuses to mint a token whose iat
@@ -116,8 +118,8 @@ function listUsers() {
   return _users.map(u => ({ id: u.id, username: u.username, role: u.role, created_at: u.created_at || null }))
 }
 
-function findUser(username) {
-  refreshUsers()
+function findUser(username, { fresh = false } = {}) {
+  refreshUsers(fresh)
   return _users.find(u => u.username === username) || null
 }
 
@@ -159,6 +161,12 @@ function verifyPassword(username, password) {
   return bcrypt.compareSync(String(password || ''), u.password_hash)
 }
 
+function validatePassword(password) {
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH || Buffer.byteLength(password, 'utf8') > 72) {
+    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters and at most 72 UTF-8 bytes`)
+  }
+}
+
 const JWT_ISSUER = 'catwaf-free'
 const JWT_AUDIENCE = 'catwaf-dashboard'
 
@@ -172,7 +180,7 @@ function softAuth(req, res, next) {
         issuer: JWT_ISSUER,
         audience: JWT_AUDIENCE,
       })
-      refreshUsers()
+      refreshUsers(true)
       const live = _users.find(u => u.id === claims.id)
       // Inclusive: a JWT iat is whole seconds, so a token minted in the same
       // second as the reset carries iat === tokens_valid_after. Treating that
@@ -197,13 +205,15 @@ function authRequired(req, res, next) {
   }
   // Idle timeout and IP/browser binding (idea #25). Required lazily so the
   // middleware stays usable in the CLI paths that never load the settings
-  // namespace, and so a failure here can never break authentication itself.
+  // namespace. An unreadable session store must reject access.
   try {
     const check = require('../services/session').touch(req.user.jti, req)
-    if (check && check.ok === false) {
-      return res.status(401).json({ detail: check.detail, code: check.code })
+    if (!check || check.ok !== true) {
+      return res.status(401).json({ detail: check?.detail || 'Session could not be verified.', code: check?.code || 'SESSION_UNVERIFIED' })
     }
-  } catch { /* session tracking is hardening, not the auth decision */ }
+  } catch {
+    return res.status(401).json({ detail: 'Session could not be verified. Log in again.', code: 'SESSION_UNVERIFIED' })
+  }
   next()
 }
 

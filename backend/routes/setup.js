@@ -12,6 +12,7 @@
 // of the few endpoints reachable before authentication.
 
 const express = require('express')
+const crypto = require('crypto')
 const rateLimit = require('express-rate-limit')
 const router = express.Router()
 
@@ -39,12 +40,20 @@ const setupLimiter = rateLimit({
 // exist at all, which is why every route below can assume bootstrap state.
 function bootstrapOnly(req, res, next) {
   if (!needsBootstrap()) return res.status(404).json({ detail: 'Not found' })
+  // Binding to loopback is insufficient: a reverse proxy can make a remote
+  // request appear local. Web bootstrap is explicitly enabled with a secret.
+  const expected = process.env.CATWAF_SETUP_TOKEN || ''
+  const provided = req.get('X-CatWAF-Setup-Token') || ''
+  const a = Buffer.from(expected), b = Buffer.from(provided)
+  if (a.length < 32 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(404).json({ detail: 'Not found' })
+  }
   next()
 }
 
 // This router is mounted ahead of the shared JSON parser (which is paired
 // with request-signing's raw-body capture), so it parses its own bodies.
-router.use('/api/setup', express.json({ limit: '64kb' }), setupLimiter, bootstrapOnly)
+router.use('/api/setup', setupLimiter, bootstrapOnly, express.json({ limit: '64kb' }))
 
 router.get('/api/setup/status', (req, res) => {
   res.json({
@@ -82,7 +91,7 @@ router.post('/api/setup/account', (req, res) => {
   }
 
   try {
-    const user = addUser({ username, password, role: 'admin' })
+    const user = addUser({ username, password, role: 'admin', bootstrap: true })
     auditSvc.audit({ user: { username }, ip: req.ip }, 'setup.account-created', username, { via: 'web-wizard' })
     log.info('Admin account created through the web setup wizard', { username })
     res.json({

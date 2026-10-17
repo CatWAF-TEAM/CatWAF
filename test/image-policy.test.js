@@ -1,0 +1,11 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { inspect } = require('../scripts/check-image-findings')
+const finding = { VulnerabilityID:'GO-2026-5932',PkgName:'golang.org/x/crypto',InstalledVersion:'v0.58.0' }
+const report = (patch = {}, target = 'usr/bin/caddy', type = 'gobinary') => ({ SchemaVersion:2,Metadata:{ImageID:'fixture'},Results:[{Target:target,Type:type,Vulnerabilities:[{...finding,...patch}]}] })
+test('previously assessed advisory now blocks without a verified local source graph', () => { const r=inspect(report());assert.equal(r.assessed.length,0);assert.equal(r.blocking.length,1) })
+test('new unfixed advisory blocks CI', () => assert.equal(inspect(report({VulnerabilityID:'GO-2099-0001'})).blocking.length,1))
+test('a newly available fix requires review and remediation', () => assert.equal(inspect(report({FixedVersion:'v0.59.0'})).blocking.length,1))
+test('a dependency version change invalidates the assessment', () => assert.equal(inspect(report({InstalledVersion:'v0.59.0'})).blocking.length,1))
+test('the same advisory in another binary blocks CI', () => assert.equal(inspect(report({},'usr/bin/other')).blocking.length,1))
+test('malformed or incomplete scan output fails closed', () => {assert.throws(()=>inspect({}));assert.throws(()=>inspect({SchemaVersion:2,Results:[]}))})

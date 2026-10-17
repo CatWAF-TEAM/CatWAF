@@ -1,32 +1,9 @@
-// test/openapi-drift.test.js — fails CI when Express routes and openapi.yaml
-// drift apart, without starting a listener: the route table is read straight
-// out of the express 4 middleware stack (app._router), the spec is parsed
-// with js-yaml, and the two sides are compared as normalized path strings.
-//
-// Comparison is at the "METHOD path" pair level for reporting but the
-// documented/unmounted verdicts are per-path (openapi.yaml groups methods
-// under a path key). Express ':id' params and spec '{id}' params are both
-// normalized to '{id}'. RegExp routes (the static/catch-all layers) cannot
-// be expressed in the spec and are skipped entirely.
-//
-// KNOWN_DRIFT — mismatches that GENUINELY exist today. These are legacy
-// endpoints where writing the missing YAML (or deleting the route) is real
-// follow-up work outside this file's scope, so each is counted as a WARNING,
-// never a failure. The list must stay honest:
-//   * a NEW undocumented/ghost mismatch FAILS the suite,
-//   * an entry that no longer drifts (route removed, or finally documented)
-//     is reported as a stale-list warning so it gets pruned.
-// Do not silence new drift by editing this list — document the endpoint.
-
+// Compare METHOD + path; no legacy warning baseline or fail-open skips.
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
-
-// ─── Environment FIRST — backend/server.js reads these at require time ──
-// Throwaway DB dir, throwaway Caddyfile, Coraza audit log under tmpdir, and
-// the Caddy admin API pinned to an unused port so nothing here can ever talk
-// to a Caddy running on this machine. PORT stays unset: we require the app,
-// we never call start(), so no listener is opened.
+const assert = require('node:assert/strict')
+const { collectRoutes, inspectContract } = require('../scripts/lib/openapi-contract')
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'catwaf-openapi-drift-'))
 process.env.DB_DIR = DIR
 process.env.CADDYFILE_PATH = path.join(DIR, 'Caddyfile')
@@ -35,242 +12,94 @@ process.env.CORAZA_AUDIT_LOG = path.join(DIR, 'logs', 'audit.json')
 process.env.CADDY_ADMIN_URL = 'http://127.0.0.1:19917'
 process.env.JWT_SECRET = 'o'.repeat(64)
 delete process.env.PORT
-
-let pass = 0, fail = 0, warned = 0
-function check(name, ok, detail) {
-  if (ok) { console.log('  ok   ' + name); pass++ }
-  else { console.log('  FAIL ' + name, detail !== undefined ? JSON.stringify(detail) : ''); fail++ }
-}
-
-// Legacy endpoints mounted in Express but absent from openapi.paths.
-// Each line was verified against the live route table when this suite was
-// written; they predate the spec or serve internal tooling. Documenting all
-// of them is deliberate follow-up work, tracked outside this file.
-const KNOWN_DRIFT_UNDOCUMENTED = [
-    'DELETE /api/intel/lists/{sourceId}',
-    'DELETE /api/plugins/{id}',
-    'DELETE /api/sensitive/block/{path}',
-    'DELETE /api/templates/{id}',
-    'DELETE /api/users/{username}',
-    'GET /api/alerts',
-    'GET /api/attack-map',
-    'GET /api/audit/summary',
-    'GET /api/auth/me',
-    'GET /api/auth/status',
-    'GET /api/autoconf',
-    'GET /api/bans/stats',
-    'GET /api/caddy/reload-queue/status',
-    'GET /api/caddy/status',
-    'GET /api/catai/status',
-    'GET /api/challenge/status',
-    'GET /api/cluster',
-    'GET /api/config/snapshots',
-    'GET /api/config/snapshots/{id}',
-    'GET /api/config/snapshots/{id}/diff',
-    'GET /api/database',
-    'GET /api/diagnostics',
-    'GET /api/diagnostics/export',
-    'GET /api/events/latest/explain',
-    'GET /api/events/{id}/explain',
-    'GET /api/handshake',
-    'GET /api/intel/asn/{ip}',
-    'GET /api/intel/dnsbl/{ip}',
-    'GET /api/intel/feed/test',
-    'GET /api/intel/network',
-    'GET /api/intel/rdns/{ip}',
-    'GET /api/logs',
-    'GET /api/mode',
-    'GET /api/performance-mode',
-    'GET /api/protect/status',
-    'GET /api/rules',
-    'GET /api/rules/search',
-    'GET /api/rules/stats',
-    'GET /api/rules/{id}',
-    'GET /api/sensitive/scan',
-    'GET /api/sensitive/state',
-    'GET /api/sessions',
-    'GET /api/sites',
-    'GET /api/templates/{id}',
-    'GET /api/templates/{id}/export',
-    'GET /api/traffic/attacks',
-    'GET /api/traffic/chart',
-    'GET /api/traffic/live',
-    'GET /api/traffic/top-ips',
-    'GET /api/users',
-    'GET /api/waf/anomaly',
-    'GET /api/waf/health',
-    'GET /api/waf/paranoia-levels',
-    'GET /api/waf/security-test',
-    'GET /api/wellknown/robots.txt',
-    'GET /api/wellknown/security.txt',
-    'POST /api/alerts',
-    'POST /api/alerts/test',
-    'POST /api/auth/2fa/recovery-codes',
-    'POST /api/auth/logout',
-    'POST /api/autoconf/scan',
-    'POST /api/backups/verify',
-    'POST /api/caches/{id}/refresh',
-    'POST /api/caddy/reload',
-    'POST /api/catai/apply',
-    'POST /api/catai/chat',
-    'POST /api/catai/undo',
-    'POST /api/challenge/reset',
-    'POST /api/cloudflare/enable-proxy',
-    'POST /api/cloudflare/gen-cert',
-    'POST /api/cloudflare/lock-origin',
-    'POST /api/cloudflare/ssl-strict',
-    'POST /api/cloudflare/test',
-    'POST /api/cloudflare/verify-dns',
-    'POST /api/cloudflare/zones',
-    'POST /api/cluster/test',
-    'POST /api/config/preview',
-    'POST /api/config/snapshots',
-    'POST /api/config/snapshots/{id}/restore',
-    'POST /api/database/apply-tuning',
-    'POST /api/database/vacuum',
-    'POST /api/events/{id}/replay',
-    'POST /api/intel/lists/refresh',
-    'POST /api/intel/network/submit',
-    'POST /api/intel/probe',
-    'POST /api/mode',
-    'POST /api/performance-mode',
-    'POST /api/plugins/from-url',
-    'POST /api/plugins/{id}/apply-defaults',
-    'POST /api/plugins/{id}/enabled',
-    'POST /api/protect/behavior/run',
-    // Express param with an inline constraint — verbatim from router.get's RegExp-ish path string.
-    'POST /api/rules/{id}/{action}(enable|disable)',
-    'POST /api/scanner/origin-exposure',
-    'POST /api/sensitive/level',
-    'POST /api/sessions/revoke-all',
-    'POST /api/simulate',
-    'POST /api/telemetry/send',
-    'POST /api/templates/import',
-    'POST /api/users',
-    'POST /api/users/{username}/password',
-    'POST /api/users/{username}/role',
-    'POST /api/waf/anomaly',
-]
-
-// Spec-only ghosts: paths documented in openapi.paths that no router mounts.
-// Empty today — every documented endpoint exists. If you remove an API,
-// remove its YAML entry too; this array is where a transition period would
-// be recorded if one were ever needed.
-const KNOWN_DRIFT_GHOSTS = []
-
+let pass = 0
+function check(name, fn) { fn(); pass++; console.log('  ok   ' + name) }
 ;(async () => {
-  const yaml = require('js-yaml') // resolves from root node_modules
-  const { app } = require('../backend/server.js')
-
-  try {
-    // ─── Enumerate mounted routes from the express 4 middleware stack ────
-    if (!app || !app._router || !Array.isArray(app._router.stack)) {
-      throw new Error('app._router.stack is not enumerable')
-    }
-    const normalizePath = p => p.replace(/:([A-Za-z0-9_]+)/g, '{$1}')
-    let skippedRegexRoutes = 0
-
-    function collectMounted() {
-      const found = []
-      const visit = stack => {
-        for (const layer of stack) {
-          if (layer.route) {
-            // RegExp paths (/^\/assets\//, the SPA catch-all, gateway's
-            // rotating-path matcher) can't map to spec entries — skip them
-            // entirely rather than guessing at a textual form.
-            if (layer.route.path instanceof RegExp) { skippedRegexRoutes++; continue }
-            const methods = Object.keys(layer.route.methods || {}).filter(m => layer.route.methods[m])
-            // router.all(...) stores a single `_all` pseudo-method.
-            const label = methods.includes('_all') ? '*' : methods.map(m => m.toUpperCase()).join(',')
-            for (const p of [normalizePath(String(layer.route.path))]) {
-              found.push({ method: label, path: p })
-            }
-          } else if (layer.name === 'router' && layer.handle && Array.isArray(layer.handle.stack)) {
-            visit(layer.handle.stack) // recurse into mounted routers
-          }
-        }
-      }
-      visit(app._router.stack)
-      return found
-    }
-
-    const mounted = collectMounted()
-    check('route enumeration walked a plausible middleware stack', mounted.length > 20, mounted.length)
-
-    const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', 'openapi.yaml'), 'utf8'))
-    check('openapi.yaml parses and declares paths', !!spec && Object.keys(spec.paths || {}).length > 20)
-
-    const docPaths = new Set(Object.keys(spec.paths).map(normalizePath))
-    const mountedPaths = new Set(mounted.map(r => r.path))
-
-    // Intentionally-undocumented surface, justified per entry: machine-to-
-    // machine or visitor-facing endpoints that sit BEFORE the dashboard auth
-    // gate and carry their own authentication (routes/gateway.js), plus the
-    // first-run wizard, which by definition runs before any account exists.
-    const ALLOWLIST = new Set([
-      '/healthz',                  // liveness probe scraped by systemd/monitors
-      '/metrics',                  // Prometheus scrape endpoint
-      '/api/enforce',              // Caddy forward_auth hop; signed, not session-authenticated
-      '/api/upload-gate',          // Caddy forward_auth upload inspection hop
-      '/catwaf-challenge',         // visitor-facing challenge interstitial page
-      '/catwaf-challenge/status',  // challenge polling from the interstitial
-      '/catwaf-challenge/verify',  // challenge answer submission
-      '/api/setup/status',         // first-run wizard bootstrap surface
-      '/api/setup/account',        // first-run admin account creation
-      '/api/setup/site',           // first-run site selection
-      '/api/setup/discover',       // first-run upstream discovery
-    ])
-
-    // (a) Every mounted /api route outside the allowlist must be documented.
-    const undocumented = []
-    const seenPairs = new Set()
-    for (const r of mounted) {
-      const key = r.method + ' ' + r.path
-      if (seenPairs.has(key)) continue // same route registered twice (e.g. GET+HEAD dedup)
-      seenPairs.add(key)
-      if (!r.path.startsWith('/api')) continue // static/catch-all surface ('/', assets)
-      if (ALLOWLIST.has(r.path)) continue
-      if (docPaths.has(r.path)) continue
-      undocumented.push(key)
-    }
-    const knownUndocumented = new Set(KNOWN_DRIFT_UNDOCUMENTED)
-    const freshUndocumented = undocumented.filter(k => !knownUndocumented.has(k))
-    check('every mounted /api route outside the allowlist is documented in openapi.yaml',
-      freshUndocumented.length === 0, freshUndocumented)
-    for (const k of undocumented.filter(k => knownUndocumented.has(k)).sort()) {
-      warned++
-      console.log('  warn  known drift (legacy endpoint, undocumented): ' + k)
-    }
-    const staleUndocumented = [...knownUndocumented].filter(k => !undocumented.includes(k)).sort()
-    for (const k of staleUndocumented) {
-      warned++
-      console.log('  warn  stale KNOWN_DRIFT entry (mismatch is gone — document it or prune): ' + k)
-    }
-
-    // (b) Every documented path must actually be mounted (spec-only ghosts).
-    const ghosts = [...docPaths].filter(p => !mountedPaths.has(p)).sort()
-    const knownGhosts = new Set(KNOWN_DRIFT_GHOSTS)
-    const freshGhosts = ghosts.filter(p => !knownGhosts.has(p))
-    check('every openapi path is actually mounted (no spec-only ghosts)',
-      freshGhosts.length === 0, freshGhosts)
-    for (const p of ghosts.filter(p => knownGhosts.has(p))) {
-      warned++
-      console.log('  warn  known drift (documented but unmounted): ' + p)
-    }
-
-    if (skippedRegexRoutes > 0) {
-      console.log(`  ·     ${skippedRegexRoutes} RegExp route(s) skipped (static asset / SPA catch-all layers)`)
-    }
-
-    console.log(`\n${pass} passed, ${fail} failed${warned ? `, ${warned} warning(s)` : ''}\n`)
-    process.exit(fail === 0 ? 0 : 1)
-  } catch (err) {
-    // Express internals changed? Skip rather than false-fail CI — but say so loudly.
-    console.log(`  SKIP  could not enumerate Express routes (${err && err.message ? err.message : err})`)
-    console.log('        express internals changed — update test/openapi-drift.test.js to match.')
-    process.exit(0)
+  const yaml = require('js-yaml')
+  const parser = require('@apidevtools/swagger-parser')
+  const { app } = require('../backend/server')
+  const spec = yaml.load(fs.readFileSync(path.join(__dirname, '..', 'openapi.yaml'), 'utf8'))
+  // External references cannot fetch URLs or read arbitrary files in CI.
+  const resolved = await parser.validate(structuredClone(spec), { resolve: { external: false } })
+  console.log('  ok   OpenAPI 3 schema and local references are valid'); pass++
+  const mounted = collectRoutes(app._router?.stack)
+  check('route inspection finds the complete API surface', () => assert.ok(mounted.operations.size > 170))
+  check('every mounted method and documented operation match', () => assert.deepEqual(inspectContract(spec, mounted), []))
+  console.log(`  ·    ${mounted.operations.size} operations, ${Object.keys(spec.paths).length} paths; ${mounted.nonApi.length} explicitly classified non-API/alias routes`)
+  const problems = (mutate, predicate) => {
+    const changed = structuredClone(spec)
+    mutate(changed)
+    assert.ok(inspectContract(changed, mounted).some(predicate))
   }
-})().catch(err => {
-  console.log(`  SKIP  openapi-drift harness error (${err && err.message ? err.message : err})`)
-  process.exit(0)
+  check('missing POST cannot hide behind a documented GET', () => problems(s => delete s.paths['/api/waf/engine'].post, e => e.includes('Undocumented POST /api/waf/engine')))
+  check('unmounted method on an existing path fails', () => problems(s => { s.paths['/api/waf/engine'].delete = structuredClone(s.paths['/api/waf/engine'].post) }, e => e.includes('Unmounted DELETE /api/waf/engine')))
+  check('missing bootstrap documentation fails', () => problems(s => delete s.paths['/api/setup/account'], e => e.includes('Undocumented POST /api/setup/account')))
+  check('gateway all-method coverage cannot silently shrink', () => problems(s => delete s.paths['/api/upload-gate'].put, e => e.includes('Undocumented PUT /api/upload-gate')))
+  check('unknown regex routes require explicit classification', () => assert.throws(() => collectRoutes([{ route: { path: /^\/new-api\//, methods: { get: true } } }]), /Unclassified RegExp/))
+  check('uninspectable Express stack fails closed', () => assert.throws(() => collectRoutes(undefined), /not enumerable/))
+  check('nested router prefixes cannot be silently ignored', () => assert.throws(() => collectRoutes([{ name: 'router', regexp: { fast_slash: false }, handle: { stack: [] } }]), /mount prefix/))
+  check('duplicate operation IDs fail', () => problems(s => { s.paths['/api/waf/engine'].get.operationId = s.paths['/api/auth/login'].post.operationId }, e => e.includes('Duplicate operationId')))
+  check('undeclared path parameter fails', () => problems(s => { s.paths['/api/rules/{id}/{action}'].parameters = [] }, e => e.includes('Missing path parameter')))
+  check('bearer-only documentation for a signed operation fails', () => problems(s => { s.paths['/api/waf/engine'].post.security = [{ bearerAuth: [] }] }, e => e.includes('Missing signing scheme')))
+  check('authentication alternatives cannot weaken AND requirements', () => problems(s => { s.paths['/api/waf/engine'].post.security.push({}) }, e => e.includes('Alternative security')))
+  check('protected operations require their rotating server prefix', () => problems(s => delete s.paths['/api/waf/engine'].post.servers, e => e.includes('Missing rotating server')))
+  check('bootstrap security cannot be silently removed', () => problems(s => { s.paths['/api/setup/account'].post.security = [] }, e => e.includes('Incorrect security')))
+  check('external references cannot evade local contract validation', () => problems(s => { s.paths['/api/auth/login'].post.responses[200] = { $ref:'https://example.invalid/response.json' } }, e => e.includes('External reference')))
+  // Real HTTP responses on a disposable database, including a non-empty
+  // snapshot and rule catalogue. Never call outbound integrations or apply
+  // deployment changes just to exercise documentation.
+  const crypto = require('crypto')
+  const Ajv = require('ajv')
+  const ajv = new Ajv({ strict: false, validateFormats: false, allErrors: true })
+  const auth = require('../backend/middleware/auth')
+  auth.addUser({ username: 'contract-admin', password: 'contract-only-password', role: 'admin', bootstrap: true })
+  const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)) })
+  const origin = `http://127.0.0.1:${server.address().port}`
+  async function validateResponse(method, template, url, options = {}) {
+    const response = await fetch(origin + url, { method, ...options })
+    const contract = resolved.paths[template][method.toLowerCase()].responses[response.status]
+    assert.ok(contract, `Undocumented response ${response.status}: ${method} ${template}`)
+    const media = response.headers.get('content-type')?.split(';')[0]
+    const schema = contract.content?.[media]?.schema
+    assert.ok(schema, `Undocumented content type ${media}: ${template}`)
+    const payload = media === 'application/json' ? await response.json() : await response.text()
+    const validate = ajv.compile(schema)
+    assert.ok(validate(payload), `${method} ${template}: ${JSON.stringify(validate.errors)}`)
+    return payload
+  }
+  try {
+    const login = await validateResponse('POST','/api/auth/login','/api/auth/login', { headers: { 'Content-Type':'application/json' }, body: JSON.stringify({username:'contract-admin',password:'contract-only-password'}) })
+    pass++; console.log('  ok   real login response includes signing and rotating-path contract')
+    const snapshot = require('../backend/services/snapshots').create({ label: 'contract fixture' })
+    require('../backend/services/db').getDb().prepare(`INSERT INTO request_log
+      (id, ts, ip, method, uri, status, action, attack_type, rule_ids, score, severity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run('contract-event', new Date().toISOString(), '192.0.2.10', 'GET', '/?id=test', 403, 'block', 'SQLi', '["942100"]', 5, 'critical')
+    const paths = [
+      '/api/auth/me','/api/auth/2fa','/api/sessions','/api/users','/api/stats',
+      '/api/traffic/chart','/api/traffic/attacks','/api/traffic/live','/api/traffic/top-ips','/api/attack-map',
+      '/api/logs','/api/audit/summary','/api/rules','/api/rules/stats','/api/rules/{id}',
+      '/api/mode','/api/performance-mode','/api/waf/engine','/api/waf/paranoia','/api/waf/anomaly','/api/waf/settings','/api/waf/paranoia-levels',
+      '/api/settings','/api/settings/schema','/api/settings/{group}',
+      '/api/config/snapshots','/api/config/snapshots/{id}','/api/config/snapshots/{id}/diff',
+      '/api/wellknown/robots.txt','/api/wellknown/security.txt',
+      '/api/sensitive/state','/api/sensitive/levels','/api/sensitive/blocked','/api/sensitive/scan',
+      '/api/alerts','/api/caddy/reload-queue/status','/api/bans','/api/bans/stats',
+      '/api/challenge/status','/api/intel/lists','/api/intel/network','/api/intel/probe/tradeoffs',
+      '/api/jobs','/api/backups','/api/telemetry','/api/templates','/api/templates/{id}','/api/templates/{id}/export',
+      '/api/plugins','/api/caches','/api/autoconf','/api/sites','/api/cluster','/api/database','/api/catai/status',
+    ]
+    for (const template of paths) {
+      const url = template.replace('{group}','headers').replace('{id}',template.startsWith('/api/config/snapshots')?snapshot.id:template.startsWith('/api/templates')?'hardened-public-site':'942100')
+      const ts = String(Date.now()), nonce = crypto.randomBytes(16).toString('hex')
+      const signature = crypto.createHmac('sha256',login.sessionKey).update(['GET',url,ts,nonce,crypto.createHash('sha256').update('').digest('hex')].join('\n')).digest('hex')
+      await validateResponse('GET',template,login.api.basePath+url,{headers:{Authorization:`Bearer ${login.token}`,'X-CatWAF-Ts':ts,'X-CatWAF-Nonce':nonce,'X-CatWAF-Sig':signature}})
+      pass++; console.log('  ok   response schema GET ' + template)
+    }
+  } finally { await new Promise(resolve => server.close(resolve)) }
+  console.log(`\n${pass} passed, 0 failed, 0 warnings\n`)
+})().then(() => process.exit(0)).catch(error => {
+  console.error(error.stack || error)
+  console.log(`\n${pass} passed, 1 failed\n`)
+  process.exit(1)
 })

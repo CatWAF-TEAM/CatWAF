@@ -102,16 +102,20 @@ router.post('/api/cloudflare/gen-cert', writeRequired, async (req, res) => {
     const hosts = requested.length ? requested : [domain, `*.${domain}`]
 
     const fs = require('fs')
-    const certDir = path.join(__dirname, '..', 'data', 'certs')
-    fs.mkdirSync(certDir, { recursive: true })
-    const keyPath = path.join(certDir, `${zone_id}.key`)
-    const csrPath = path.join(certDir, `${zone_id}.csr`)
+    const certDir = path.join(require('../services/db').DB_DIR, 'certs')
+    fs.mkdirSync(certDir, { recursive: true, mode: 0o700 })
+    // Unique names prevent concurrent requests from pairing a certificate
+    // with a different private key. Reserve the key with restrictive mode.
+    const certName = `${zone_id}-${require('crypto').randomBytes(12).toString('hex')}`
+    const keyPath = path.join(certDir, `${certName}.key`)
+    const csrPath = path.join(certDir, `${certName}.csr`)
+    fs.closeSync(fs.openSync(keyPath, 'wx', 0o600))
     execFileSync('openssl', [
       'req', '-new', '-newkey', 'rsa:2048', '-nodes',
       '-keyout', keyPath,
       '-subj', `/CN=${domain}`,
       '-out', csrPath,
-    ], { stdio: 'pipe' })
+    ], { stdio: 'pipe', timeout: 15000 })
     const csr = fs.readFileSync(csrPath, 'utf8')
 
     const data = await cloudflareSvc.cfFetch('/certificates', token, {
@@ -124,7 +128,7 @@ router.post('/api/cloudflare/gen-cert', writeRequired, async (req, res) => {
       }),
     })
 
-    const certPath = path.join(certDir, `${zone_id}.pem`)
+    const certPath = path.join(certDir, `${certName}.pem`)
     // Private-key material must not be world-readable regardless of umask.
     fs.writeFileSync(certPath, data.result.certificate, { mode: 0o644 })
     try { fs.chmodSync(keyPath, 0o600) } catch {}
@@ -191,9 +195,9 @@ router.post('/api/cloudflare/lock-origin', writeRequired, async (req, res) => {
     // The read-modify-write above and the reload below run under the same
     // config lock every other Caddyfile writer uses, and the write itself is
     // atomic — a concurrent CLI patch can no longer be clobbered here.
-    configLock.atomicWriteFileSync(caddySvc.CADDYFILE_PATH, content, { mode: 0o644 })
-
-    const { reloaded, error: reloadErr } = caddySvc.reloadCaddy()
+    const tx = require('../services/configTx').apply({ label: 'cloudflare.lock-origin', req, caddyfile: content, render: false, mutate: () => {} })
+    if (!tx.ok) return res.status(500).json({ detail: tx.error, rolledBack: tx.rolledBack, recoveryRequired: tx.recoveryRequired })
+    const { reloaded, reloadError: reloadErr } = tx
 
     auditSvc.audit(req, 'cloudflare.lock-origin', '', { ranges: ranges.length, reloaded })
     res.json({

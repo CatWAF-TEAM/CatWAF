@@ -1,6 +1,7 @@
 
 const crypto = require('crypto')
 const secrets = require('../services/secrets')
+const db = require('../services/db')
 const { FIXED_PATHS } = require('./dynamicPath')
 
 const MAX_SKEW_MS = 2 * 60 * 1000
@@ -8,21 +9,17 @@ const NONCE_TTL_MS = 5 * 60 * 1000
 
 const SIGNATURE_EXEMPT_PATHS = new Set([...FIXED_PATHS])
 
-const seenNonces = new Map()
-
-function rememberNonce(nonce) {
+let lastNonceSweep = 0
+function rememberNonce(sessionId, nonce) {
   const now = Date.now()
-  if (seenNonces.size > 10000) {
-    for (const [k, exp] of seenNonces) if (exp <= now) seenNonces.delete(k)
+  const conn = db.getDb()
+  if (now - lastNonceSweep > 60000) {
+    conn.prepare('DELETE FROM request_nonces WHERE expires_at <= ?').run(now)
+    lastNonceSweep = now
   }
-  seenNonces.set(nonce, now + NONCE_TTL_MS)
-}
-
-function nonceSeen(nonce) {
-  const exp = seenNonces.get(nonce)
-  if (exp === undefined) return false
-  if (exp <= Date.now()) { seenNonces.delete(nonce); return false }
-  return true
+  // Unique insertion is atomic across workers and survives backend restarts.
+  return conn.prepare('INSERT OR IGNORE INTO request_nonces (session_id, nonce, expires_at) VALUES (?, ?, ?)')
+    .run(sessionId, nonce, now + NONCE_TTL_MS).changes === 1
 }
 
 function sha256Hex(buf) {
@@ -66,9 +63,6 @@ function verifySignature(req, res, next) {
   if (!Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > MAX_SKEW_MS) {
     return res.status(401).json({ detail: 'Request timestamp outside the accepted window.', code: 'SIG_EXPIRED' })
   }
-  if (nonceSeen(nonce)) {
-    return res.status(401).json({ detail: 'Replayed request rejected.', code: 'SIG_REPLAY' })
-  }
 
   const sessionKey = secrets.sessionKey(req.user.jti)
   const expected = sign(sessionKey, {
@@ -83,7 +77,9 @@ function verifySignature(req, res, next) {
     return res.status(401).json({ detail: 'Invalid request signature.', code: 'SIG_INVALID' })
   }
 
-  rememberNonce(nonce)
+  if (!rememberNonce(req.user.jti, nonce)) {
+    return res.status(401).json({ detail: 'Replayed request rejected.', code: 'SIG_REPLAY' })
+  }
   next()
 }
 

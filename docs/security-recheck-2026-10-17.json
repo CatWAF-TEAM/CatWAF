@@ -1,0 +1,1091 @@
+{
+  "generatedAt": "2026-10-17T09:54:52.931Z",
+  "baseCommit": "de0b84a3730c5e53a21ffd4cbc044f407fffb0b7",
+  "applicationLanguage": "Node.js / JavaScript",
+  "goSourceFiles": 0,
+  "customRuntimePatches": false,
+  "runtimeSourceSha256": "a8ecbeab23731f32276cdcc75331d617f6ce839d95f25fd7ff58434e5d0da206",
+  "proxy": {
+    "version": "v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4=",
+    "sha256": "7e2adaa80b0bf1ebd1356c69b8caefeb8e213babd826afbedb96f997ac2f250f",
+    "scanner": "govulncheck binary mode, symbols retained",
+    "reachableFindings": 0,
+    "importedPackageFindings": 0,
+    "requiredModuleFindings": 1
+  },
+  "releaseReady": false,
+  "blockers": [
+    "reload connection resets",
+    "audit-record loss during overlapping requests and rotations",
+    "GO-2026-5932 module advisory"
+  ],
+  "checks": {
+    "statuses": {
+      "npm-ci": 0,
+      "frontend-ci": 0,
+      "npm-audit": 0,
+      "frontend-audit": 0,
+      "dashboard-build": 0,
+      "all-suites": 1,
+      "upgrades": 0,
+      "config-scan": 0,
+      "secret-scan": 0,
+      "binary-scan": 0,
+      "image-scan-backend": 0,
+      "image-policy-backend": 1,
+      "image-scan-caddy": 0,
+      "image-policy-caddy": 1,
+      "image-scan-test-app": 0,
+      "image-policy-test-app": 0,
+      "container-lifecycle": 0
+    },
+    "suites": [
+      {
+        "file": "apps-api.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 4955,
+        "summaries": [
+          "37 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "attack.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 9043,
+        "summaries": [
+          "142 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "audit-lifetime-e2e.test.js",
+        "exit": 1,
+        "signal": null,
+        "durationMs": 7770,
+        "summaries": [
+          "ℹ tests 1",
+          "ℹ pass 0",
+          "ℹ fail 1",
+          "ℹ skipped 0"
+        ],
+        "failures": [
+          "✖ a request finishing after multiple rotations retains its audit record (7707.644921ms)",
+          "✖ failing tests:",
+          "✖ a request finishing after multiple rotations retains its audit record (7707.644921ms)",
+          "  AssertionError [ERR_ASSERTION]: the completed request must remain auditable after rotation"
+        ]
+      },
+      {
+        "file": "audit-log.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 2449,
+        "summaries": [
+          "37 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "audit-rotation.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 2505,
+        "summaries": [
+          "61 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "auth-flow.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 47756,
+        "summaries": [
+          "27 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "catai.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 960,
+        "summaries": [
+          "66 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "concurrency.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 545,
+        "summaries": [
+          "16 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "discovery.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 1739,
+        "summaries": [
+          "291 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "edge-e2e.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 637,
+        "summaries": [
+          "13 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "edition.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 1616,
+        "summaries": [
+          "166 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "extensions.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 4052,
+        "summaries": [
+          "35 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "features.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 1766,
+        "summaries": [
+          "32 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "frontend-smoke.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 63063,
+        "summaries": [
+          "44 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "healthcheck.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 199,
+        "summaries": [
+          "ℹ tests 7",
+          "ℹ pass 7",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ],
+        "failures": []
+      },
+      {
+        "file": "image-policy.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 73,
+        "summaries": [
+          "ℹ tests 6",
+          "ℹ pass 6",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ],
+        "failures": []
+      },
+      {
+        "file": "openapi-drift.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 2119,
+        "summaries": [
+          "73 passed, 0 failed, 0 warnings"
+        ],
+        "failures": []
+      },
+      {
+        "file": "platform.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 2818,
+        "summaries": [
+          "110 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "protect-e2e.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 841,
+        "summaries": [
+          "33 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "protection-units.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 162,
+        "summaries": [
+          "167 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "qr.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 150,
+        "summaries": [
+          "39 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "reliability-e2e.test.js",
+        "exit": 1,
+        "signal": null,
+        "durationMs": 8538,
+        "summaries": [
+          "ℹ tests 10",
+          "ℹ pass 8",
+          "ℹ fail 2",
+          "ℹ skipped 0"
+        ],
+        "failures": [
+          "  ✖ concurrent valid and invalid reloads never bypass or drop sampled requests (2481.775039ms)",
+          "✖ WAF availability through reloads and dependency failures (8474.725919ms)",
+          "✖ failing tests:",
+          "✖ concurrent valid and invalid reloads never bypass or drop sampled requests (2481.775039ms)",
+          "  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:"
+        ]
+      },
+      {
+        "file": "render.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 589,
+        "summaries": [
+          "12 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "restore-e2e.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 1128,
+        "summaries": [
+          "ℹ tests 1",
+          "ℹ pass 1",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ],
+        "failures": []
+      },
+      {
+        "file": "security-audit.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 4912,
+        "summaries": [
+          "ℹ tests 28",
+          "ℹ pass 28",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ],
+        "failures": []
+      },
+      {
+        "file": "security-recovery.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 1376,
+        "summaries": [
+          "ℹ tests 17",
+          "ℹ pass 17",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ],
+        "failures": []
+      },
+      {
+        "file": "security.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 3955,
+        "summaries": [
+          "52 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "sfl-e2e.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 2479,
+        "summaries": [
+          "39 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "storage-failure.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 170,
+        "summaries": [
+          "ℹ tests 10",
+          "ℹ pass 10",
+          "ℹ fail 0",
+          "ℹ skipped 0"
+        ],
+        "failures": []
+      },
+      {
+        "file": "subdomain.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 690,
+        "summaries": [
+          "39 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "trust-proxy.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 6056,
+        "summaries": [
+          "4 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "upload-scan.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 287,
+        "summaries": [
+          "44 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "waf-e2e.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 772,
+        "summaries": [
+          "37 passed, 0 failed"
+        ],
+        "failures": []
+      },
+      {
+        "file": "waftools.test.js",
+        "exit": 0,
+        "signal": null,
+        "durationMs": 6361,
+        "summaries": [
+          "167 passed, 0 failed"
+        ],
+        "failures": []
+      }
+    ],
+    "openapi": {
+      "checks": 73,
+      "warnings": 0,
+      "paths": 161,
+      "operations": 191
+    },
+    "filesystemFailures": {
+      "status": "passed",
+      "filesystem": "private 32 MiB tmpfs",
+      "checks": [
+        {
+          "name": "ENOSPC during lock payload closes descriptors and permits immediate reacquisition",
+          "passed": true,
+          "durationMs": 98
+        },
+        {
+          "name": "unwritable configuration directory refuses publication and rolls back settings",
+          "passed": true,
+          "durationMs": 9
+        },
+        {
+          "name": "SQLite SQLITE_FULL preserves committed data and reports a successful rollback",
+          "passed": true,
+          "durationMs": 18
+        },
+        {
+          "name": "ENOSPC when persisting the recovery journal never publishes the candidate",
+          "passed": true,
+          "durationMs": 322
+        },
+        {
+          "name": "SIGKILL immediately after publication recovers old configuration and SQLite data",
+          "passed": true,
+          "durationMs": 629
+        },
+        {
+          "name": "invalid recovery journal fails closed without changing live data",
+          "passed": true,
+          "durationMs": 1
+        },
+        {
+          "name": "truncated SQLite backup is rejected without changing the database",
+          "passed": true,
+          "durationMs": 221
+        },
+        {
+          "name": "ENOSPC in the audit rotation journal leaves the active log and configuration intact",
+          "passed": true,
+          "durationMs": 22
+        },
+        {
+          "name": "healthy transaction succeeds after all storage and crash failures",
+          "passed": true,
+          "durationMs": 274
+        }
+      ]
+    },
+    "containerLifecycle": {
+      "project": "catwaf-reliability-e82aaa68ddaf",
+      "checks": [
+        "named TLS and runtime volumes",
+        "real Unix admin health",
+        "no pending recovery",
+        "allowed traffic and SQLi blocking",
+        "API outage independence",
+        "container recreation",
+        "identical TLS certificate after recreation",
+        "blocking after recreation"
+      ],
+      "passed": 8
+    },
+    "upgradeMatrix": [
+      {
+        "previousVersion": "1.0.1",
+        "edition": "lite",
+        "upgrade": "passed",
+        "reopen": "passed",
+        "offlineRollback": "passed",
+        "reupgrade": "passed",
+        "corruptBackupRejected": true,
+        "originalConfigBytes": 1552
+      },
+      {
+        "previousVersion": "1.0.1",
+        "edition": "full",
+        "upgrade": "passed",
+        "reopen": "passed",
+        "offlineRollback": "passed",
+        "reupgrade": "passed",
+        "corruptBackupRejected": true,
+        "originalConfigBytes": 1552
+      },
+      {
+        "previousVersion": "1.0.2",
+        "edition": "lite",
+        "upgrade": "passed",
+        "reopen": "passed",
+        "offlineRollback": "passed",
+        "reupgrade": "passed",
+        "corruptBackupRejected": true,
+        "originalConfigBytes": 1552
+      },
+      {
+        "previousVersion": "1.0.2",
+        "edition": "full",
+        "upgrade": "passed",
+        "reopen": "passed",
+        "offlineRollback": "passed",
+        "reupgrade": "passed",
+        "corruptBackupRejected": true,
+        "originalConfigBytes": 1552
+      }
+    ],
+    "npm": {
+      "backend": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "frontend": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      }
+    },
+    "configuration": {
+      "passed": 216,
+      "findings": 0
+    },
+    "secrets": {
+      "findings": 0
+    },
+    "staticAnalysis": {
+      "targets": 308,
+      "parseErrors": 0,
+      "findings": [
+        {
+          "rule": "rules.javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal",
+          "file": "backend/routes/cloudflare.js",
+          "line": 110,
+          "disposition": "reviewed false positive; raw result retained",
+          "reason": "The zone ID is restricted to hexadecimal characters before constructing random-suffixed filenames. Signed live API tests reject traversal before upstream calls."
+        },
+        {
+          "rule": "rules.javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal",
+          "file": "backend/routes/cloudflare.js",
+          "line": 111,
+          "disposition": "reviewed false positive; raw result retained",
+          "reason": "The zone ID is restricted to hexadecimal characters before constructing random-suffixed filenames. Signed live API tests reject traversal before upstream calls."
+        },
+        {
+          "rule": "rules.javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal",
+          "file": "backend/routes/cloudflare.js",
+          "line": 131,
+          "disposition": "reviewed false positive; raw result retained",
+          "reason": "The zone ID is restricted to hexadecimal characters before constructing random-suffixed filenames. Signed live API tests reject traversal before upstream calls."
+        },
+        {
+          "rule": "rules.javascript.express.security.audit.xss.direct-response-write.direct-response-write",
+          "file": "backend/routes/ops.js",
+          "line": 85,
+          "disposition": "reviewed false positive; raw result retained",
+          "reason": "HTML report generation escapes strings, including attacker-controlled log fields; a regression checks script markup is escaped."
+        }
+      ]
+    },
+    "images": {
+      "backend": {
+        "imageId": "sha256:a10369ca3fd943f74185f6ceea3ef58d9abb771998b29cfe80a175c0c16bd626",
+        "findings": [
+          {
+            "target": "usr/bin/caddy",
+            "id": "GO-2026-5932",
+            "package": "golang.org/x/crypto",
+            "version": "v0.58.0",
+            "fixedVersion": null
+          }
+        ]
+      },
+      "caddy": {
+        "imageId": "sha256:35cde099d40f371394b63be0ece55f01f197da71488604caec74ca3843ec4190",
+        "findings": [
+          {
+            "target": "usr/bin/caddy",
+            "id": "GO-2026-5932",
+            "package": "golang.org/x/crypto",
+            "version": "v0.58.0",
+            "fixedVersion": null
+          }
+        ]
+      },
+      "test-app": {
+        "imageId": "sha256:9937fbb13fff42e49561e5d1101f23f9084bf6248419662d9cb498299d2cdbe8",
+        "findings": []
+      }
+    },
+    "fixtureImages": {
+      "booknook-apache": {
+        "imageId": "sha256:57419df30acb10d8cba7bd8c6a6fd8655110ce8db52d2174558e40a1b85c0818",
+        "findings": []
+      },
+      "booknook-php": {
+        "imageId": "sha256:573d272138ba37db940bfd2e98896008a113c6c46c63db00b2e310126d874aba",
+        "findings": []
+      },
+      "fake-web-php": {
+        "imageId": "sha256:506535a1c5aa600bd465d98363ae932e0c9263fe374194a764440e9406686af2",
+        "findings": []
+      },
+      "catwaf-fixture-nginx": {
+        "imageId": "sha256:c51a03002f87b3b1f48dc6d06bd4935769f03d5168bf9c9288a663bcb98f5673",
+        "findings": []
+      },
+      "catwaf-fixture-database": {
+        "imageId": "sha256:ff38287b6626d9d1076e742eb41d87bb86aa685112ec3e93a9a8b1dc5358e03e",
+        "findings": []
+      }
+    },
+    "reload": {
+      "sampledRequests": 1280,
+      "concurrency": 4,
+      "validReloads": 21,
+      "rejectedReloads": 20,
+      "failedPairs": 13,
+      "pairLatencyP95Ms": 17
+    },
+    "auditLifetime": {
+      "rotations": [
+        [],
+        [
+          {
+            "name": "audit.json",
+            "reason": "beyond max files"
+          }
+        ],
+        [
+          {
+            "name": "audit-20261017T094018Z.json",
+            "reason": "beyond max files"
+          }
+        ]
+      ],
+      "originalLogExists": false,
+      "matchingAuditRows": 0
+    },
+    "load": {
+      "startedAt": "2026-10-17T09:39:04.626Z",
+      "requestedSeconds": 900,
+      "concurrency": 24,
+      "paceMs": 100,
+      "limits": {
+        "errors": 0,
+        "bypasses": 0,
+        "duplicateWrites": 0,
+        "p99Ms": 5000,
+        "rssMiB": 768,
+        "diskMiB": 1024,
+        "descriptors": 2048
+      },
+      "status": "failed",
+      "requests": 142227,
+      "writes": 35560,
+      "reloads": 434,
+      "rotations": 48,
+      "h2UnprocessedRefusals": 8,
+      "errorCount": 89,
+      "errors": [
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "http",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        },
+        {
+          "protocol": "https",
+          "message": "socket hang up"
+        }
+      ],
+      "peakRssMiB": 159.63671875,
+      "peakDiskMiB": 566.0401039123535,
+      "peakDescriptors": 122,
+      "protocols": {
+        "http": 48112,
+        "https": 47111,
+        "h2": 47004
+      },
+      "runtimeSourceSha256": "a8ecbeab23731f32276cdcc75331d617f6ce839d95f25fd7ff58434e5d0da206",
+      "nodeVersion": "v24.19.0",
+      "proxyVersion": "v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4=",
+      "proxySha256": "7e2adaa80b0bf1ebd1356c69b8caefeb8e213babd826afbedb96f997ac2f250f",
+      "elapsedSeconds": 900.547047207,
+      "expectedWrites": 35580,
+      "bypasses": 0,
+      "duplicateWrites": 0,
+      "p99Ms": 622,
+      "error": "AssertionError [ERR_ASSERTION]: every failed request or maintenance operation blocks release\n\n89 !== 0\n\n    at main (/tmp/catwaf-security-20261016/repo/scripts/check-load-reliability.js:158:12)",
+      "caddyExit": {
+        "code": 0,
+        "signal": null
+      },
+      "finishedAt": "2026-10-17T09:54:05.804Z"
+    }
+  },
+  "limitations": [
+    "Reload connection resets remain unresolved on the existing upstream dependency; no Node-only connection-management fix has been implemented.",
+    "A slow request spanning multiple rotations can lose its audit record after an old file is pruned. The positive logging control passes and the new strict regression fails.",
+    "GO-2026-5932 has no fixed version. Binary scanning finds no affected imported packages, but the unfiltered image gate still blocks its module record.",
+    "15-minute local Linux/amd64 load is not a completed 24-hour soak or a production-capacity benchmark.",
+    "Physical power loss, block-device EIO, kernel-OOM, network filesystems and the full supported-platform installer matrix were not tested.",
+    "API rejection tests and representative response schemas do not exhaust valid payload combinations or WAF evasions.",
+    "Third-party provider accounts, real ACME issuance, and complete ClamAV/Ollama deployment matrices were not exercised.",
+    "No equivalence to BunkerWeb reliability or guarantee of zero bugs/vulnerabilities is established."
+  ],
+  "evidenceDirectory": "node-security-recheck-2026-10-17",
+  "earlierLoads": {
+    "load-900s.json": "completed earlier runtime snapshot",
+    "load-current-900s.json": "completed before last audit rollback-preservation patch",
+    "load-interrupted-715s.json": "interrupted by WSL restart; not a completed run",
+    "load-final-900s.json": "completed final runtime; hash verified against export"
+  }
+}

@@ -4,11 +4,18 @@ const fs = require('fs')
 const { DatabaseSync } = require('node:sqlite')
 
 const DB_DIR = process.env.DB_DIR || path.join(__dirname, '..', '..', 'data')
-if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true, mode: 0o750 })
 
 let DB_PATH = process.env.DB_PATH || path.join(DB_DIR, 'catwaf.db')
 
 function openDb(dbPath) {
+  // Create before SQLite opens WAL sidecars so secrets are never created
+  // world-readable under a permissive process umask.
+  if (dbPath !== ':memory:') {
+    const fd = fs.openSync(dbPath, 'a', 0o600)
+    fs.closeSync(fd)
+    fs.chmodSync(dbPath, 0o600)
+  }
   const instance = new DatabaseSync(dbPath)
 
   // busy_timeout MUST come first: journal_mode=WAL below needs a brief
@@ -40,6 +47,13 @@ function openDb(dbPath) {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS request_nonces (
+      session_id TEXT NOT NULL,
+      nonce TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, nonce)
+    );
+    CREATE INDEX IF NOT EXISTS request_nonces_expiry ON request_nonces(expires_at);
     CREATE TABLE IF NOT EXISTS audit_log (
       id    TEXT PRIMARY KEY,
       ts    TEXT,
@@ -155,6 +169,7 @@ function migrateColumns(instance, table, columns) {
   }
 }
 
+let access = require('./databaseAccess').open(DB_PATH)
 let db = openDb(DB_PATH)
 
 function getState(key) {
@@ -162,19 +177,38 @@ function getState(key) {
   if (!row) return null
   try { return JSON.parse(row.value) } catch { return null }
 }
+// Authentication state must distinguish absent data from damaged JSON.
+function getStateStrict(key) {
+  const row = db.prepare('SELECT value FROM waf_state WHERE key = ?').get(key)
+  if (!row) return null
+  const value = JSON.parse(row.value)
+  if (value === null) throw new Error(`Invalid null state: ${key}`)
+  return value
+}
 function setState(key, value) {
   db.prepare('INSERT OR REPLACE INTO waf_state (key, value) VALUES (?, ?)').run(key, JSON.stringify(value))
 }
 
 function switchDb(newPath) {
+  db.close()
+  access.close()
+  access = require('./databaseAccess').open(newPath)
   db = openDb(newPath)
   DB_PATH = newPath
   return db
 }
 
+function withOfflineAccess(fn) {
+  return access.exclusive(() => {
+    db.close()
+    try { return fn(DB_PATH) }
+    finally { db = openDb(DB_PATH) }
+  })
+}
+
 module.exports = {
   getDb: () => db,
-  getState, setState, switchDb,
+  getState, getStateStrict, setState, switchDb, withOfflineAccess,
   get DB_PATH() { return DB_PATH },
   DB_DIR,
 }

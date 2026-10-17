@@ -55,12 +55,17 @@ function main() {
   delete env.npm_config_only
   delete env.npm_config_production
 
-  const r = spawnSync('npm', ['install', '--include=dev'], {
+  const npmArgs = ['ci', '--include=dev']
+  // npm supplies its CLI path during lifecycle scripts. Executing it with
+  // Node also avoids relying on a shell to launch npm.cmd on Windows.
+  const command = process.env.npm_execpath ? process.execPath : 'npm'
+  const args = process.env.npm_execpath ? [process.env.npm_execpath, ...npmArgs] : npmArgs
+  const r = spawnSync(command, args, {
     cwd: FRONTEND, stdio: 'inherit', shell: false, env,
   })
   if (r.status !== 0) {
     log('Dashboard dependency install failed. The WAF and CLI still work.')
-    log('Retry with: npm --prefix frontend install --include=dev && npm run build')
+    log('Retry with: npm --prefix frontend ci --include=dev && npm run build')
   }
 }
 

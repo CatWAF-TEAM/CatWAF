@@ -144,7 +144,19 @@ function save(name, { groups = null, includeWaf = true, description = '', req = 
 
 function get(id) {
   if (Object.hasOwn(BUILT_IN, id)) return { id, built_in: true, ...BUILT_IN[id] }
-  return load()[id] || null
+  const all = load()
+  if (!Object.hasOwn(all, id)) return null
+  // Older releases allowed imported secrets. Redact on read as well so an
+  // upgrade cannot expose existing imports through viewer/export endpoints.
+  const template = snapshots.redactSecrets(all[id])
+  for (const [group, values] of Object.entries(template.settings || {})) {
+    if (!settings.isGroup(group)) { delete template.settings[group]; continue }
+    for (const [field, spec] of Object.entries(settings.SCHEMA[group].fields)) {
+      if (spec.writeOnly) delete values[field]
+    }
+    if (group === 'cluster' && values.url) values.url = settings.redact(group, values).url
+  }
+  return template
 }
 
 function list() {
@@ -241,7 +253,11 @@ function importTemplate(payload, { req = null } = {}) {
     if (!settings.isGroup(group)) return { ok: false, error: `Unknown settings group "${group}" in the import.` }
     const check = settings.validate(group, values)
     if (!check.ok) return { ok: false, error: `${group}: ${check.error}` }
-    cleanSettings[group] = values
+    // Imports have the same secret-free contract as captured templates.
+    cleanSettings[group] = snapshots.redactSecrets(Object.fromEntries(Object.keys(values).map(k => [k, check.value[k]])))
+    for (const [field, spec] of Object.entries(settings.SCHEMA[group].fields)) {
+      if (spec.writeOnly) delete cleanSettings[group][field]
+    }
   }
   const cleanWaf = {}
   for (const [field, value] of Object.entries(payload.waf || {})) {

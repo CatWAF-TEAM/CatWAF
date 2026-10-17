@@ -1,0 +1,1599 @@
+{
+  "baseCommit": "de0b84a3730c5e53a21ffd4cbc044f407fffb0b7",
+  "generatedAt": "2026-10-17",
+  "routerDeclarations": 176,
+  "routeModules": 20,
+  "note": "Authorization probes are not successful-payload or exhaustive fuzz coverage. server.js additionally defines public GET /healthz and SPA fallback; Express supplies HEAD for GET and OPTIONS handling.",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/alerts",
+      "source": "backend/routes/alerts.js",
+      "line": 19,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/alerts",
+      "source": "backend/routes/alerts.js",
+      "line": 31,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/alerts/test",
+      "source": "backend/routes/alerts.js",
+      "line": 62,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/apps",
+      "source": "backend/routes/apps.js",
+      "line": 88,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/apps/discover",
+      "source": "backend/routes/apps.js",
+      "line": 103,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/apps/preview",
+      "source": "backend/routes/apps.js",
+      "line": 136,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/apps/protect",
+      "source": "backend/routes/apps.js",
+      "line": 150,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/apps/verify",
+      "source": "backend/routes/apps.js",
+      "line": 180,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/attack-map",
+      "source": "backend/routes/dashboard.js",
+      "line": 81,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/summary",
+      "source": "backend/routes/waftools.js",
+      "line": 70,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/2fa",
+      "source": "backend/routes/ops.js",
+      "line": 271,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/2fa/confirm",
+      "source": "backend/routes/ops.js",
+      "line": 286,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/2fa/disable",
+      "source": "backend/routes/ops.js",
+      "line": 296,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/2fa/enroll",
+      "source": "backend/routes/ops.js",
+      "line": 275,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/2fa/recovery-codes",
+      "source": "backend/routes/ops.js",
+      "line": 309,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "source": "backend/routes/auth.js",
+      "line": 26,
+      "boundary": "password plus configured MFA; login throttling",
+      "adminRequired": false,
+      "checks": "login, password-reset race, MFA and rate-limit suites"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "source": "backend/routes/auth.js",
+      "line": 126,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "source": "backend/routes/auth.js",
+      "line": 136,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/status",
+      "source": "backend/routes/auth.js",
+      "line": 132,
+      "boundary": "public setup-required boolean",
+      "adminRequired": false,
+      "checks": "auth and bootstrap suites"
+    },
+    {
+      "method": "GET",
+      "path": "/api/autoconf",
+      "source": "backend/routes/ops.js",
+      "line": 209,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/autoconf/scan",
+      "source": "backend/routes/ops.js",
+      "line": 211,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/backups",
+      "source": "backend/routes/ops.js",
+      "line": 46,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/backups/run",
+      "source": "backend/routes/ops.js",
+      "line": 48,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/backups/verify",
+      "source": "backend/routes/ops.js",
+      "line": 58,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bans",
+      "source": "backend/routes/protect.js",
+      "line": 31,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/bans",
+      "source": "backend/routes/protect.js",
+      "line": 47,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/bans/:id",
+      "source": "backend/routes/protect.js",
+      "line": 69,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/bans/clear",
+      "source": "backend/routes/protect.js",
+      "line": 86,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/bans/lift",
+      "source": "backend/routes/protect.js",
+      "line": 77,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bans/stats",
+      "source": "backend/routes/protect.js",
+      "line": 45,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/caches",
+      "source": "backend/routes/ops.js",
+      "line": 191,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/caches/:id/clear",
+      "source": "backend/routes/ops.js",
+      "line": 193,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/caches/:id/refresh",
+      "source": "backend/routes/ops.js",
+      "line": 200,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/caddy/reload",
+      "source": "backend/routes/caddy.js",
+      "line": 8,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/caddy/reload-queue/status",
+      "source": "backend/routes/caddy.js",
+      "line": 36,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/caddy/status",
+      "source": "backend/routes/caddy.js",
+      "line": 19,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/catai/apply",
+      "source": "backend/routes/catai.js",
+      "line": 201,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/catai/chat",
+      "source": "backend/routes/catai.js",
+      "line": 112,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/catai/status",
+      "source": "backend/routes/catai.js",
+      "line": 37,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/catai/undo",
+      "source": "backend/routes/catai.js",
+      "line": 220,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenge/preview",
+      "source": "backend/routes/protect.js",
+      "line": 264,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/challenge/reset",
+      "source": "backend/routes/protect.js",
+      "line": 256,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/challenge/scope-test",
+      "source": "backend/routes/protect.js",
+      "line": 271,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/challenge/status",
+      "source": "backend/routes/protect.js",
+      "line": 252,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/enable-proxy",
+      "source": "backend/routes/cloudflare.js",
+      "line": 58,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/gen-cert",
+      "source": "backend/routes/cloudflare.js",
+      "line": 90,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/lock-origin",
+      "source": "backend/routes/cloudflare.js",
+      "line": 144,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/ssl-strict",
+      "source": "backend/routes/cloudflare.js",
+      "line": 76,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/test",
+      "source": "backend/routes/cloudflare.js",
+      "line": 214,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/verify-dns",
+      "source": "backend/routes/cloudflare.js",
+      "line": 40,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cloudflare/zones",
+      "source": "backend/routes/cloudflare.js",
+      "line": 21,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/cluster",
+      "source": "backend/routes/ops.js",
+      "line": 224,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/cluster/test",
+      "source": "backend/routes/ops.js",
+      "line": 226,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/config/preview",
+      "source": "backend/routes/settings.js",
+      "line": 133,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/config/render-report",
+      "source": "backend/routes/settings.js",
+      "line": 171,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/config/snapshots",
+      "source": "backend/routes/waftools.js",
+      "line": 174,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/config/snapshots",
+      "source": "backend/routes/waftools.js",
+      "line": 178,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/config/snapshots/:id",
+      "source": "backend/routes/waftools.js",
+      "line": 185,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/config/snapshots/:id/diff",
+      "source": "backend/routes/waftools.js",
+      "line": 191,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/config/snapshots/:id/restore",
+      "source": "backend/routes/waftools.js",
+      "line": 198,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/database",
+      "source": "backend/routes/ops.js",
+      "line": 230,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/database/apply-tuning",
+      "source": "backend/routes/ops.js",
+      "line": 238,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/database/vacuum",
+      "source": "backend/routes/ops.js",
+      "line": 232,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/diagnostics",
+      "source": "backend/routes/health.js",
+      "line": 13,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/diagnostics/export",
+      "source": "backend/routes/health.js",
+      "line": 70,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "ALL",
+      "path": "/api/enforce",
+      "source": "backend/routes/gateway.js",
+      "line": 100,
+      "boundary": "derived Caddy gateway key",
+      "adminRequired": false,
+      "checks": "key rejection, upload scanning, TLS preservation, challenge classification"
+    },
+    {
+      "method": "GET",
+      "path": "/api/events/:id/explain",
+      "source": "backend/routes/waftools.js",
+      "line": 28,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/events/:id/replay",
+      "source": "backend/routes/waftools.js",
+      "line": 34,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/events/latest/explain",
+      "source": "backend/routes/waftools.js",
+      "line": 22,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/geo",
+      "source": "backend/routes/network.js",
+      "line": 57,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/geo/:cc",
+      "source": "backend/routes/network.js",
+      "line": 58,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/handshake",
+      "source": "backend/routes/auth.js",
+      "line": 141,
+      "boundary": "bearer token plus live session",
+      "adminRequired": false,
+      "checks": "revoked session rejected"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/asn/:ip",
+      "source": "backend/routes/protect.js",
+      "line": 141,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/dnsbl/:ip",
+      "source": "backend/routes/protect.js",
+      "line": 152,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/feed/test",
+      "source": "backend/routes/protect.js",
+      "line": 225,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/lists",
+      "source": "backend/routes/protect.js",
+      "line": 203,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/intel/lists/:sourceId",
+      "source": "backend/routes/protect.js",
+      "line": 217,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/intel/lists/refresh",
+      "source": "backend/routes/protect.js",
+      "line": 205,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/network",
+      "source": "backend/routes/protect.js",
+      "line": 229,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/intel/network/submit",
+      "source": "backend/routes/protect.js",
+      "line": 231,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/intel/probe",
+      "source": "backend/routes/protect.js",
+      "line": 190,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/probe/tradeoffs",
+      "source": "backend/routes/protect.js",
+      "line": 197,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/intel/rdns/:ip",
+      "source": "backend/routes/protect.js",
+      "line": 147,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/ip/:list/:ip",
+      "source": "backend/routes/network.js",
+      "line": 44,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/ip/add",
+      "source": "backend/routes/network.js",
+      "line": 17,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ip/blacklist",
+      "source": "backend/routes/network.js",
+      "line": 16,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/ip/whitelist",
+      "source": "backend/routes/network.js",
+      "line": 15,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "source": "backend/routes/ops.js",
+      "line": 33,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:name/run",
+      "source": "backend/routes/ops.js",
+      "line": 37,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/logs",
+      "source": "backend/routes/waftools.js",
+      "line": 41,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/mode",
+      "source": "backend/routes/waftools.js",
+      "line": 160,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/mode",
+      "source": "backend/routes/waftools.js",
+      "line": 164,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/performance-mode",
+      "source": "backend/routes/waf.js",
+      "line": 129,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/performance-mode",
+      "source": "backend/routes/waf.js",
+      "line": 140,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/plugins",
+      "source": "backend/routes/ops.js",
+      "line": 136,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/plugins",
+      "source": "backend/routes/ops.js",
+      "line": 150,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/plugins/:id",
+      "source": "backend/routes/ops.js",
+      "line": 182,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/plugins/:id/apply-defaults",
+      "source": "backend/routes/ops.js",
+      "line": 175,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/plugins/:id/enabled",
+      "source": "backend/routes/ops.js",
+      "line": 168,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/plugins/from-url",
+      "source": "backend/routes/ops.js",
+      "line": 157,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/protect/behavior",
+      "source": "backend/routes/protect.js",
+      "line": 242,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/protect/behavior/run",
+      "source": "backend/routes/protect.js",
+      "line": 244,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/protect/status",
+      "source": "backend/routes/protect.js",
+      "line": 95,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/protect/test",
+      "source": "backend/routes/protect.js",
+      "line": 123,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports",
+      "source": "backend/routes/ops.js",
+      "line": 76,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rules",
+      "source": "backend/routes/waftools.js",
+      "line": 118,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rules/:id",
+      "source": "backend/routes/waftools.js",
+      "line": 136,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/rules/:id/:action(enable|disable)",
+      "source": "backend/routes/waftools.js",
+      "line": 141,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rules/search",
+      "source": "backend/routes/waftools.js",
+      "line": 128,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rules/stats",
+      "source": "backend/routes/waftools.js",
+      "line": 134,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/scanner/origin-exposure",
+      "source": "backend/routes/scanner.js",
+      "line": 34,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/security/score",
+      "source": "backend/routes/security.js",
+      "line": 7,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sensitive/block",
+      "source": "backend/routes/sensitive.js",
+      "line": 33,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/sensitive/block/:path",
+      "source": "backend/routes/sensitive.js",
+      "line": 44,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sensitive/blocked",
+      "source": "backend/routes/sensitive.js",
+      "line": 16,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sensitive/level",
+      "source": "backend/routes/sensitive.js",
+      "line": 18,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sensitive/levels",
+      "source": "backend/routes/sensitive.js",
+      "line": 14,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sensitive/scan",
+      "source": "backend/routes/sensitive.js",
+      "line": 53,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sensitive/state",
+      "source": "backend/routes/sensitive.js",
+      "line": 11,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sessions",
+      "source": "backend/routes/ops.js",
+      "line": 259,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/sessions/revoke-all",
+      "source": "backend/routes/ops.js",
+      "line": 263,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings",
+      "source": "backend/routes/settings.js",
+      "line": 28,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/:group",
+      "source": "backend/routes/settings.js",
+      "line": 36,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/settings/:group",
+      "source": "backend/routes/settings.js",
+      "line": 100,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/:group",
+      "source": "backend/routes/settings.js",
+      "line": 101,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/:group/preview",
+      "source": "backend/routes/settings.js",
+      "line": 122,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/:group/reset",
+      "source": "backend/routes/settings.js",
+      "line": 103,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/schema",
+      "source": "backend/routes/settings.js",
+      "line": 24,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/setup/account",
+      "source": "backend/routes/setup.js",
+      "line": 80,
+      "boundary": "bootstrap token and no initialized account",
+      "adminRequired": false,
+      "checks": "bootstrap token and closed-after-setup regressions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/setup/discover",
+      "source": "backend/routes/setup.js",
+      "line": 123,
+      "boundary": "bootstrap token and no initialized account",
+      "adminRequired": false,
+      "checks": "bootstrap token and closed-after-setup regressions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/setup/site",
+      "source": "backend/routes/setup.js",
+      "line": 116,
+      "boundary": "bootstrap token and no initialized account",
+      "adminRequired": false,
+      "checks": "bootstrap token and closed-after-setup regressions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/setup/status",
+      "source": "backend/routes/setup.js",
+      "line": 58,
+      "boundary": "bootstrap token and no initialized account",
+      "adminRequired": false,
+      "checks": "bootstrap token and closed-after-setup regressions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/simulate",
+      "source": "backend/routes/waftools.js",
+      "line": 97,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/sites",
+      "source": "backend/routes/ops.js",
+      "line": 220,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/stats",
+      "source": "backend/routes/dashboard.js",
+      "line": 11,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/telemetry",
+      "source": "backend/routes/ops.js",
+      "line": 64,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/telemetry/send",
+      "source": "backend/routes/ops.js",
+      "line": 66,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates",
+      "source": "backend/routes/ops.js",
+      "line": 90,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/templates",
+      "source": "backend/routes/ops.js",
+      "line": 98,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/templates/:id",
+      "source": "backend/routes/ops.js",
+      "line": 113,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates/:id",
+      "source": "backend/routes/ops.js",
+      "line": 92,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/templates/:id/apply",
+      "source": "backend/routes/ops.js",
+      "line": 106,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates/:id/export",
+      "source": "backend/routes/ops.js",
+      "line": 120,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/templates/import",
+      "source": "backend/routes/ops.js",
+      "line": 127,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tls/status",
+      "source": "backend/routes/ops.js",
+      "line": 246,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/tls/validate",
+      "source": "backend/routes/ops.js",
+      "line": 250,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/traffic/attacks",
+      "source": "backend/routes/dashboard.js",
+      "line": 58,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/traffic/chart",
+      "source": "backend/routes/dashboard.js",
+      "line": 36,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/traffic/live",
+      "source": "backend/routes/dashboard.js",
+      "line": 71,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/traffic/top-ips",
+      "source": "backend/routes/dashboard.js",
+      "line": 72,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "ALL",
+      "path": "/api/upload-gate",
+      "source": "backend/routes/gateway.js",
+      "line": 213,
+      "boundary": "derived Caddy gateway key",
+      "adminRequired": false,
+      "checks": "key rejection, upload scanning, TLS preservation, challenge classification"
+    },
+    {
+      "method": "GET",
+      "path": "/api/upload-scan/status",
+      "source": "backend/routes/protect.js",
+      "line": 163,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/upload-scan/test",
+      "source": "backend/routes/protect.js",
+      "line": 180,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "source": "backend/routes/users.js",
+      "line": 15,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users",
+      "source": "backend/routes/users.js",
+      "line": 19,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/users/:username",
+      "source": "backend/routes/users.js",
+      "line": 73,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/:username/password",
+      "source": "backend/routes/users.js",
+      "line": 34,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/:username/role",
+      "source": "backend/routes/users.js",
+      "line": 60,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/anomaly",
+      "source": "backend/routes/waf.js",
+      "line": 38,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waf/anomaly",
+      "source": "backend/routes/waf.js",
+      "line": 42,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/engine",
+      "source": "backend/routes/waf.js",
+      "line": 10,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waf/engine",
+      "source": "backend/routes/waf.js",
+      "line": 11,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/health",
+      "source": "backend/routes/waftools.js",
+      "line": 204,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/paranoia",
+      "source": "backend/routes/waf.js",
+      "line": 18,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waf/paranoia",
+      "source": "backend/routes/waf.js",
+      "line": 24,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/paranoia-levels",
+      "source": "backend/routes/waftools.js",
+      "line": 214,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/security-test",
+      "source": "backend/routes/waftools.js",
+      "line": 209,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/waf/settings",
+      "source": "backend/routes/waf.js",
+      "line": 103,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/waf/settings",
+      "source": "backend/routes/waf.js",
+      "line": 104,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "POST",
+      "path": "/api/waf/settings",
+      "source": "backend/routes/waf.js",
+      "line": 106,
+      "boundary": "signed live session",
+      "adminRequired": true,
+      "checks": "anonymous 401; JWT without signature 401; viewer 403"
+    },
+    {
+      "method": "GET",
+      "path": "/api/wellknown/robots.txt",
+      "source": "backend/routes/settings.js",
+      "line": 190,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/api/wellknown/security.txt",
+      "source": "backend/routes/settings.js",
+      "line": 195,
+      "boundary": "signed live session",
+      "adminRequired": false,
+      "checks": "anonymous 401; JWT without signature 401"
+    },
+    {
+      "method": "GET",
+      "path": "/catwaf-challenge",
+      "source": "backend/routes/gateway.js",
+      "line": 374,
+      "boundary": "public; rate limit; challenge proof or signed cookie",
+      "adminRequired": false,
+      "checks": "challenge, forwarding-identity and provider unit suites"
+    },
+    {
+      "method": "GET",
+      "path": "/catwaf-challenge/status",
+      "source": "backend/routes/gateway.js",
+      "line": 390,
+      "boundary": "public; rate limit; challenge proof or signed cookie",
+      "adminRequired": false,
+      "checks": "challenge, forwarding-identity and provider unit suites"
+    },
+    {
+      "method": "POST",
+      "path": "/catwaf-challenge/verify",
+      "source": "backend/routes/gateway.js",
+      "line": 397,
+      "boundary": "public; rate limit; challenge proof or signed cookie",
+      "adminRequired": false,
+      "checks": "challenge, forwarding-identity and provider unit suites"
+    },
+    {
+      "method": "GET",
+      "path": "/metrics",
+      "source": "backend/routes/gateway.js",
+      "line": 470,
+      "boundary": "configured metrics bearer token",
+      "adminRequired": false,
+      "checks": "extensions metrics authentication checks"
+    }
+  ],
+  "openapi": {
+    "paths": 161,
+    "operations": 191,
+    "coverageWarnings": 0,
+    "liveResponseSamples": 56
+  }
+}

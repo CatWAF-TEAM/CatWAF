@@ -6,9 +6,9 @@ database container that is not a web service.
 
 | Container | Image | Ports |
 |---|---|---|
-| `freshmart_nginx` | `nginx:1.25-alpine` | `80`, **not published** |
+| `freshmart_nginx` | `catwaf-fixture-nginx` (pinned stable nginx) | `80`, **not published** |
 | `freshmart_php` | `fake-web-php` (built here, from `php:8.3-fpm-alpine`) | `9000`, not published |
-| `freshmart_db` | `mariadb:10.11` | `3306`, not published |
+| `freshmart_db` | `catwaf-fixture-database` (patched Alpine MariaDB) | `3306`, not published |
 
 **Nothing is published to the host.** That is deliberate: this fixture
 verifies that CatWAF discovers a Docker-internal HTTP service and reaches it
@@ -126,3 +126,10 @@ a corroborating signal (the shared `./www` webroot provides `index.php`).
 ```bash
 docker compose -p fake-web -f test/fixtures/nginx-php-fpm/docker-compose.yml down -v
 ```
+
+The fixture Dockerfiles apply distribution security updates and run without root.
+The shared Database.Dockerfile creates only Unix-socket administrative accounts;
+there is no embedded root password or remote database user. The sample pages do
+not use the database: its purpose is to prove discovery rejects non-HTTP services.
+Run `bash scripts/check-discovery-fixtures.sh` from the repository to build and
+check both stacks; it refuses existing fixture containers and cleans up its own.

@@ -113,64 +113,9 @@ function applyLocked({ routes, waf, dryRun = false } = {}) {
     return { ok: true, dryRun: true, config: generated, merged, routes, auditLog }
   }
 
-  const tmpPath = `${caddySvc.CADDYFILE_PATH}.catwaf-auto-tmp-${process.pid}-${Date.now()}`
-  try {
-    fs.writeFileSync(tmpPath, merged, 'utf8')
-  } catch (e) {
-    if (e.code === 'EACCES' || e.code === 'EPERM') {
-      // By far the most common cause: CatWAF is running unprivileged
-      // against a root-owned /etc/caddy/Caddyfile. Say what to do about it.
-      return {
-        ok: false,
-        error: `CatWAF cannot write to ${caddySvc.CADDYFILE_PATH} (permission denied).`,
-        message: [
-          `That file is owned by another user, and CatWAF is running as ${process.getuid ? `uid ${process.getuid()}` : 'this user'}.`,
-          'Either run CatWAF as a user that can write it (for example with sudo, or as the caddy user),',
-          'or point CATWAF at a config file you can write:  CADDYFILE_PATH=/path/you/own/Caddyfile catwaf start',
-        ].join('\n'),
-        routes,
-      }
-    }
-    return { ok: false, error: `Could not write a temporary Caddyfile for validation: ${e.message}`, routes }
-  }
-
-  const validation = configTx.validateCaddyfile(tmpPath)
-  if (!validation.ok) {
-    try { fs.unlinkSync(tmpPath) } catch {}
-    return {
-      ok: false,
-      error: `Configuration validation failed: ${validation.error}`,
-      message: 'CatWAF did not activate the new configuration. The previous configuration has been preserved.',
-      routes,
-    }
-  }
-
-  let backup = null
-  try {
-    backup = hadFile ? configTx.backupCaddyfile() : null
-  } catch (e) {
-    try { fs.unlinkSync(tmpPath) } catch {}
-    return { ok: false, error: `Could not back up the existing Caddyfile: ${e.message}`, routes }
-  }
-
-  try {
-    fs.renameSync(tmpPath, caddySvc.CADDYFILE_PATH)
-  } catch (e) {
-    try { fs.unlinkSync(tmpPath) } catch {}
-    return { ok: false, error: `Could not write the Caddyfile: ${e.message}`, backup, routes }
-  }
-
-  const reload = caddySvc.reloadCaddy()
-  return {
-    ok: true,
-    auditLog,
-    backup,
-    reloaded: !!reload.reloaded,
-    reloadError: reload.reloaded ? null : (reload.error || null),
-    validationSkipped: validation.skipped || null,
-    routes,
-    config: generated,
-  }
+  const tx = configTx.apply({ label: 'apps.protect', caddyfile: merged, render: false, mutate: () => {} })
+  if (!tx.ok && tx.phase === 'caddy-validate') tx.error = 'Configuration validation failed: ' + tx.error
+  return { ...tx, auditLog, routes, config: generated }
 }
 
 module.exports = { apply, mergeIntoCaddyfile, refreshManagedWafBlock }

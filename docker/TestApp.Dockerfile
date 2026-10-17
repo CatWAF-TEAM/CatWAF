@@ -12,7 +12,9 @@
 # Never widen that bind past loopback, and never deploy this anywhere
 # reachable from a network you do not control.
 
-FROM node:22-alpine
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules /opt/yarn* /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 WORKDIR /app
 COPY test/testapp/server.js ./server.js
@@ -28,4 +30,6 @@ ENV TEST_APP_HOST=0.0.0.0
 
 USER node
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.TEST_APP_PORT||8080)+'/',{signal:AbortSignal.timeout(4000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 CMD ["node", "server.js"]

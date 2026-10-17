@@ -2,8 +2,15 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
+const configLock = require('./configLock')
 
 const PROJECT_ROOT = path.join(__dirname, '..', '..')
+const DASHBOARD_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data:; font-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'",
+}
 
 const DOMAIN_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/i
 
@@ -23,6 +30,9 @@ function dashboardHostFor(baseDomain) {
 function caddyConfig({ dashboardHost, apiPort, distPath }) {
   return [
     `${dashboardHost} {`,
+    '    header {',
+    ...Object.entries(DASHBOARD_HEADERS).map(([name, value]) => `        ${name} "${value}"`),
+    '    }',
     `    handle /api/* {`,
     `        reverse_proxy 127.0.0.1:${apiPort}`,
     `    }`,
@@ -45,6 +55,7 @@ function nginxConfig({ dashboardHost, apiPort, distPath }) {
     `    listen 80;`,
     `    listen [::]:80;`,
     `    server_name ${dashboardHost};`,
+    ...Object.entries(DASHBOARD_HEADERS).map(([name, value]) => `    add_header ${name} "${value}" always;`),
     ``,
     `    root ${distPath};`,
     `    index index.html;`,
@@ -81,6 +92,7 @@ function apacheConfig({ dashboardHost, apiPort, distPath }) {
   return [
     `<VirtualHost *:80>`,
     `    ServerName ${dashboardHost}`,
+    ...Object.entries(DASHBOARD_HEADERS).map(([name, value]) => `    Header always set ${name} "${value}"`),
     ``,
     `    DocumentRoot ${distPath}`,
     ``,
@@ -257,11 +269,15 @@ function backupFile(filePath) {
   if (!fs.existsSync(filePath)) return null
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const backup = `${filePath}.catwaf-backup-${stamp}`
-  fs.copyFileSync(filePath, backup)
+  fs.writeFileSync(backup, fs.readFileSync(filePath), { mode: 0o600, flag: 'wx' })
   return backup
 }
 
 function apply(planResult) {
+  return configLock.withConfigLock(() => applyLocked(planResult))
+}
+
+function applyLocked(planResult) {
   if (!planResult || !planResult.ok) return { ok: false, error: planResult?.error || 'no plan' }
   if (!planResult.automatable) {
     return { ok: false, error: 'This target does not support automatic configuration.', unsupportedReason: planResult.unsupportedReason }
@@ -296,12 +312,12 @@ function apply(planResult) {
     }
 
     fs.mkdirSync(path.dirname(dest), { recursive: true })
-    fs.writeFileSync(dest, next, 'utf8')
+    configLock.atomicWriteFileSync(dest, next, { mode: 0o640 })
 
     const validation = spec.validate(dest)
     if (!validation.ok) {
       if (previous === null) { try { fs.unlinkSync(dest) } catch {} }
-      else fs.writeFileSync(dest, previous, 'utf8')
+      else configLock.atomicWriteFileSync(dest, previous, { mode: 0o640 })
       return {
         ok: false,
         error: `Configuration validation failed: ${validation.error}`,
@@ -322,7 +338,7 @@ function apply(planResult) {
       dashboardHost: planResult.dashboardHost,
     }
   } catch (e) {
-    if (previous !== null) { try { fs.writeFileSync(dest, previous, 'utf8') } catch {} }
+    if (previous !== null) { try { configLock.atomicWriteFileSync(dest, previous, { mode: 0o640 }) } catch {} }
     return { ok: false, error: e.message, rolledBack: previous !== null, backup, destination: dest }
   }
 }

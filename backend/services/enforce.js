@@ -12,8 +12,8 @@
 // Two properties this pass has to hold:
 //
 //   * Bounded latency. Everything network-bound runs in parallel under one
-//     deadline, and a composite verdict is cached per address — a slow DNSBL
-//     must never become a slow site.
+//     deadline. Individual intelligence sources cache their own results;
+//     request-dependent final verdicts are recomputed on every request.
 //   * Fail open. If a signal errors or times out, it contributes nothing.
 //     These are advisory signals layered on top of the WAF; none of them is
 //     load-bearing enough to justify refusing traffic when it breaks.
@@ -38,19 +38,7 @@ const { ipCoveredBy, normalizeClientIp } = require('./sanitize')
 const log = logger.child('enforce')
 const counters = require('./counters')
 const NS = 'verdict'
-const VERDICT_TTL_MS = 20_000
-const VERDICT_TTL_EMERGENCY_MS = 2_000
 const DEADLINE_MS = 2500
-
-// Under-attack mode shortens every cached verdict so lifting the switch
-// takes effect within seconds instead of twenty.
-function verdictTtl() {
-  try {
-    const ddos = settings.get('ddos')
-    if (!ddos.emergency) return VERDICT_TTL_MS
-    return Math.max(1, Number(ddos.verdict_ttl_seconds) || 2) * 1000
-  } catch { return VERDICT_TTL_MS }
-}
 
 // Which settings groups, when on, mean the forward_auth hop is worth
 // rendering at all. Kept next to the pipeline so the renderer and the
@@ -298,27 +286,15 @@ async function classify(request, { dryRun = false } = {}) {
   }
 }
 
-// Cached entry point used by the forward_auth hop. Only the address, not the
-// path, keys the cache — every signal in the pipeline is address-based, and
-// the challenge decision is re-evaluated per request from the cached signals.
+// The forward_auth entry point evaluates request context on every call.
 async function evaluate(request) {
   const ip = normalizeClientIp(request.ip || '')
   if (!ip) return { action: 'allow', reason: 'No client address.', signals: [], cached: false }
 
-  // The cache is keyed by address only, but the canary signal is
-  // path-dependent: an allow earned on "/" must never excuse "/.env", so
-  // canary-touching requests always run the full classification.
-  if (!canaryMatches(String(request.uri || '/'))) {
-    const cached = cache.get(NS, ip)
-    if (cached && cached.action !== 'challenge') {
-      return { ...cached, cached: true }
-    }
-  }
-
+  // Final decisions depend on path exemptions, user agent, headers, current
+  // bans and current settings. Reusing an IP-only allow bypasses those
+  // checks. Network intelligence already has its own bounded TTL caches.
   const verdict = await classify(request)
-  // A challenge verdict is not cached: whether this particular request needs
-  // one depends on its path and on the cookie it carries.
-  if (verdict.action !== 'challenge') cache.set(NS, ip, verdict, verdictTtl())
   return { ...verdict, cached: false }
 }
 
@@ -333,7 +309,7 @@ function status() {
     active: isActive(),
     features: activeFeatures(),
     deadline_ms: DEADLINE_MS,
-    verdict_cache_ttl_ms: VERDICT_TTL_MS,
+    verdict_cache_ttl_ms: 0,
     caches: cache.stats(),
     bans: bans.stats(),
   }

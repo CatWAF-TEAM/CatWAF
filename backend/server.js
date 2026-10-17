@@ -35,8 +35,8 @@ process.on('unhandledRejection', (reason) => {
 // and every call is same-origin (see isSameOrigin below).
 let CORS_ORIGIN = process.env.CORS_ORIGIN
 if (!CORS_ORIGIN) {
-  CORS_ORIGIN = 'http://localhost:8081'
-  console.warn('[CatWAF] CORS_ORIGIN is not set — allowing the Vite dev server (http://localhost:8081) in addition to this server\'s own origin.')
+  CORS_ORIGIN = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8081'
+  console.warn(`[CatWAF] CORS_ORIGIN is not set — allowing same-origin requests${CORS_ORIGIN ? ' and http://localhost:8081 for development' : ' only'}.`)
 }
 const allowedOrigins = CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean)
 
@@ -148,7 +148,7 @@ function isSameOrigin(req, origin) {
   // `x-forwarded-proto` is only trusted as far as trust proxy is configured,
   // and either way both candidates are compared — a proxy that terminates TLS
   // gives the browser https:// while this process sees http://.
-  return origin === `http://${host}` || origin === `https://${host}`
+  return origin === `${req.protocol}://${host}`
 }
 
 app.use(cors((req, cb) => {
@@ -161,6 +161,10 @@ app.use(cors((req, cb) => {
 }))
 
 app.get('/healthz', (req, res) => res.json({ ok: true }))
+app.use((req, res, next) => {
+  if (/^\/(?:api|g)(?:\/|$)/i.test(req.path)) res.set('Cache-Control', 'no-store')
+  next()
+})
 
 // Routes that have to live at a fixed URL, outside the rotating admin path:
 // Caddy's enforcement hop, the visitor-facing challenge page, the metrics
@@ -192,10 +196,10 @@ const gatedLimiter = rateLimit({
 
 app.use(unwrapDynamicPath)
 app.use(recordSignedPath)
-app.use(express.json({ limit: '2mb', verify: captureRawBody }))
 app.use('/api', softAuth)
 app.use('/api', (req, res, next) => (req.viaDynamicPath ? gatedLimiter : ungatedLimiter)(req, res, next))
 app.use(requireDynamicPath(decoyNotFound))
+app.use(express.json({ limit: '2mb', verify: captureRawBody }))
 app.use('/api', verifySignature)
 app.use('/api', (req, res, next) => (req.viaDynamicPath ? authRequired(req, res, next) : next()))
 app.use(requestLogger)
@@ -218,6 +222,26 @@ app.use(require('./routes/settings'))
 app.use(require('./routes/protect'))
 app.use(require('./routes/apps'))
 app.use(require('./routes/ops'))
+
+// Express 4 does not forward rejected route promises. Apply one boundary
+// to all mounted handlers, including the pre-gate routers, so a failed
+// storage read or asynchronous integration produces an error response.
+function containAsyncErrors(stack) {
+  for (const layer of stack) {
+    if (layer.route) containAsyncErrors(layer.route.stack)
+    else if (layer.handle?.stack) containAsyncErrors(layer.handle.stack)
+    else if (layer.handle.length < 4) {
+      const handler = layer.handle
+      layer.handle = function containedHandler(req, res, next) {
+        try {
+          const result = handler(req, res, next)
+          if (result && typeof result.catch === 'function') result.catch(next)
+        } catch (error) { next(error) }
+      }
+    }
+  }
+}
+containAsyncErrors(app._router.stack)
 
 const DIST = path.join(__dirname, '..', 'frontend', 'dist')
 if (fs.existsSync(path.join(DIST, 'index.html'))) {
@@ -249,6 +273,8 @@ const requestLogSvc = require('./services/requestLog')
 const state = require('./services/state')
 
 function start() {
+  require('./services/configTx').recover()
+  require('./services/configTx').assertReady()
   if (auditSvc.getSnapshots().length === 0) auditSvc.snapshot({ user: { username: 'system' } }, 'initial')
 
   // SQLite pragmas that are configurable rather than hardcoded.

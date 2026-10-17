@@ -73,20 +73,22 @@ function readState(basePath) {
   try {
     const raw = fs.readFileSync(stateFileFor(basePath), 'utf8')
     const parsed = JSON.parse(raw)
-    return (parsed && typeof parsed === 'object') ? parsed : {}
-  } catch { return {} }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid audit rotation state')
+    return parsed
+  } catch (error) { if (error.code === 'ENOENT') return {}; throw error }
 }
 
 function writeState(basePath, next) {
   const file = stateFileFor(basePath)
-  const tmp = `${file}.tmp-${process.pid}`
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true })
-    fs.writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf8')
-    fs.renameSync(tmp, file)   // atomic
+    configLock.atomicWriteFileSync(file, JSON.stringify(next, null, 2), { mode: 0o640 })
+    if (process.platform !== 'win32') {
+      const fd = fs.openSync(path.dirname(file), 'r')
+      try { fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+    }
     return true
   } catch {
-    try { fs.unlinkSync(tmp) } catch {}
     return false
   }
 }
@@ -221,31 +223,7 @@ function repointCaddyfileLocked(from, to) {
   }
   const next = content.split(needle).join(`SecAuditLog ${to}`)
 
-  const tmp = `${caddySvc.CADDYFILE_PATH}.catwaf-rotate-tmp-${process.pid}-${Date.now()}`
-  try {
-    fs.writeFileSync(tmp, next, 'utf8')
-  } catch (e) {
-    return { ok: false, error: `Cannot write ${caddySvc.CADDYFILE_PATH}: ${e.message}` }
-  }
-
-  const validation = configTx.validateCaddyfile(tmp)
-  if (!validation.ok) {
-    try { fs.unlinkSync(tmp) } catch {}
-    return { ok: false, error: `Rotated configuration failed validation: ${validation.error}` }
-  }
-
-  let backup = null
-  try { backup = configTx.backupCaddyfile() } catch { /* non-fatal */ }
-
-  try {
-    fs.renameSync(tmp, caddySvc.CADDYFILE_PATH)
-  } catch (e) {
-    try { fs.unlinkSync(tmp) } catch {}
-    return { ok: false, error: `Cannot replace the Caddyfile: ${e.message}` }
-  }
-
-  const reload = caddySvc.reloadCaddy()
-  return { ok: true, backup, reloaded: !!reload.reloaded, reloadError: reload.reloaded ? null : (reload.error || null) }
+  return configTx.apply({ label: 'audit-log.repoint', caddyfile: next, render: false, mutate: () => {} })
 }
 
 // ── rotation ──────────────────────────────────────────────────────────
@@ -260,8 +238,17 @@ function drain(filePath) {
 // Finishes or reverts a rotation that was interrupted. Decided by what the
 // Caddyfile actually says, not by what we intended.
 function recover(basePath = caddySvc.baseAuditLogPath()) {
+  return configLock.withConfigLock(() => recoverLocked(basePath))
+}
+function recoverLocked(basePath) {
   const st = readState(basePath)
   if (!st.pending) return { recovered: false }
+
+  // A failed configuration rollback can leave the proxy and disk on different
+  // generations. Resolve that journal before using the Caddyfile as evidence
+  // that a log is safe to retire or remove.
+  try { configTx.recover() }
+  catch (error) { return { recovered: false, outcome: 'deferred', error: error.message } }
 
   // State-file values are plain JSON beside the logs; treat them like any
   // other path input rather than trusting them blindly.
@@ -285,7 +272,7 @@ function recover(basePath = caddySvc.baseAuditLogPath()) {
       // delete a log whose contents never reached the database.
       return { recovered: false, outcome: 'deferred', error: drained.error }
     }
-    writeState(basePath, { active: to, rotatedAt: st.pending.startedAt || new Date().toISOString(), activeSince: new Date().toISOString() })
+    if (!writeState(basePath, { active: to, rotatedAt: st.pending.startedAt || new Date().toISOString(), activeSince: new Date().toISOString() })) return { recovered: false, error: 'Cannot persist completed audit rotation; recovery is still pending.' }
     return { recovered: true, outcome: 'completed' }
   }
 
@@ -293,7 +280,7 @@ function recover(basePath = caddySvc.baseAuditLogPath()) {
   try {
     if (to && fs.existsSync(to) && fs.statSync(to).size === 0) fs.unlinkSync(to)
   } catch {}
-  writeState(basePath, { active: from || basePath, activeSince: readState(basePath).activeSince })
+  if (!writeState(basePath, { active: from || basePath, activeSince: readState(basePath).activeSince })) return { recovered: false, error: 'Cannot persist reverted audit rotation; recovery is still pending.' }
   return { recovered: true, outcome: 'reverted' }
 }
 
@@ -301,6 +288,9 @@ function recover(basePath = caddySvc.baseAuditLogPath()) {
 // The active log is never a candidate, and a file that has not been fully
 // ingested is kept regardless.
 function prune(env = process.env) {
+  return configLock.withConfigLock(() => pruneLocked(env))
+}
+function pruneLocked(env) {
   const base = caddySvc.baseAuditLogPath()
   const active = activePath(base)
   const cfg = config(env)
@@ -314,7 +304,9 @@ function prune(env = process.env) {
     if (st.pending) pendingPaths = [st.pending.from, st.pending.to].filter(Boolean)
   } catch {}
 
-  const archives = listFiles(base).filter(f => f.path !== active)
+  // The live Caddyfile remains authoritative even if a sidecar update failed.
+  const referenced = new Set([...caddySvc.readCaddyfile().matchAll(/\bSecAuditLog\s+(\S+)/g)].map(m => m[1]))
+  const archives = listFiles(base).filter(f => f.path !== active && !referenced.has(f.path))
   const deleted = []
   const failed = []
 
@@ -337,9 +329,13 @@ function prune(env = process.env) {
 }
 
 // Rotate now. Safe to call when rotation is not needed — callers decide.
-function rotate({ env = process.env, reason = 'manual' } = {}) {
+function rotate(options = {}) {
+  return configLock.withConfigLock(() => rotateLocked(options))
+}
+function rotateLocked({ env = process.env, reason = 'manual' } = {}) {
   const base = caddySvc.baseAuditLogPath()
-  recover(base)
+  const recovered = recover(base)
+  if (recovered.error || readState(base).pending) return { ok: false, pendingRetry: true, error: recovered.error || 'Previous audit rotation is still pending.' }
 
   const from = activePath(base)
   const to = nextActivePath(base)
@@ -354,33 +350,42 @@ function rotate({ env = process.env, reason = 'manual' } = {}) {
   // Create the new active file first so Coraza has something to open the
   // moment the reload lands.
   try {
-    fs.mkdirSync(path.dirname(to), { recursive: true })
-    fs.closeSync(fs.openSync(to, 'a'))
-    try { fs.chmodSync(to, 0o640) } catch {}
+    fs.mkdirSync(path.dirname(to), { recursive: true, mode: 0o750 })
+    fs.closeSync(fs.openSync(to, 'wx', 0o660))
   } catch (e) {
     return { ok: false, error: `Cannot create the next audit log (${to}): ${e.code || e.message}` }
   }
 
   // Marker first: a crash from here on is recoverable either way.
-  writeState(base, { active: from, pending: { from, to, startedAt: new Date().toISOString(), reason } })
+  if (!writeState(base, { active: from, pending: { from, to, startedAt: new Date().toISOString(), reason } })) {
+    try { fs.unlinkSync(to) } catch {}
+    return { ok: false, error: 'Cannot persist audit rotation journal; the active log was not changed.' }
+  }
 
   const repoint = repointCaddyfile(from, to)
   if (!repoint.ok) {
+    if (repoint.recoveryRequired || repoint.rolledBack === false) {
+      return { ok: false, from, to, error: repoint.error, rolledBack: false, recoveryRequired: true, pendingRetry: true }
+    }
     try { fs.unlinkSync(to) } catch {}
-    writeState(base, { active: from })
-    return { ok: false, error: repoint.error, rolledBack: true }
+    const saved = writeState(base, { active: from })
+    return { ok: false, error: repoint.error, rolledBack: true, pendingRetry: !saved }
   }
 
   if (!repoint.reloaded) {
     // Coraza is still writing to `from` — the switch has not taken effect,
     // so put the configuration back rather than leave a split state.
     const back = repointCaddyfile(to, from)
+    if (!back.ok) {
+      return { ok: false, from, to, error: back.error || 'Cannot restore the previous audit log configuration.', rolledBack: false, recoveryRequired: true, pendingRetry: true }
+    }
     try { fs.unlinkSync(to) } catch {}
-    writeState(base, { active: from })
+    const saved = writeState(base, { active: from })
     return {
       ok: false,
       error: `The proxy did not reload (${repoint.reloadError || 'unknown'}), so the audit log was not rotated.`,
       rolledBack: back.ok,
+      pendingRetry: !saved,
     }
   }
 
@@ -405,7 +410,7 @@ function rotate({ env = process.env, reason = 'manual' } = {}) {
       pruneFailures: [],
     }
   }
-  writeState(base, { active: to, rotatedAt: new Date().toISOString(), activeSince: new Date().toISOString() })
+  if (!writeState(base, { active: to, rotatedAt: new Date().toISOString(), activeSince: new Date().toISOString() })) return { ok: false, pendingRetry: true, from, to, error: 'Cannot persist completed audit rotation; recovery is still pending.' }
 
   const pruned = prune(env)
   return {
@@ -424,8 +429,10 @@ function rotate({ env = process.env, reason = 'manual' } = {}) {
 // throws — audit-log housekeeping must not take down the caller.
 function maintain({ env = process.env, force = false } = {}) {
   try {
+    return configLock.withConfigLock(() => {
     const base = caddySvc.baseAuditLogPath()
     const recovered = recover(base)
+    if (recovered.error || readState(base).pending) return { ok: false, rotated: false, pendingRetry: true, recovered, error: recovered.error || 'Previous audit rotation is still pending.' }
     const need = force ? { rotate: true, reason: 'forced' } : needsRotation(env)
     if (!need.rotate) {
       const pruned = prune(env)
@@ -433,6 +440,7 @@ function maintain({ env = process.env, force = false } = {}) {
     }
     const result = rotate({ env, reason: need.reason })
     return { ok: result.ok, rotated: result.ok, recovered, ...result }
+    })
   } catch (e) {
     return { ok: false, rotated: false, error: e.message }
   }

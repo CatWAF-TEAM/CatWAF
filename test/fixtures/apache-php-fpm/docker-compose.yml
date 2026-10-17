@@ -7,7 +7,7 @@
 #
 #     booknook_apache  httpd:2.4-alpine    container 80,   NOT published
 #     booknook_php     (built here)        container 9000, not published
-#     booknook_db      mariadb:10.11       container 3306, not published
+#     booknook_db      Alpine MariaDB     container 3306, not published
 #
 # Nothing is published to the host. CatWAF must discover Apache on the
 # Docker network and reach it without any host port mapping — and, because
@@ -64,14 +64,14 @@ services:
       - no-new-privileges:true
 
   db:
-    image: mariadb:10.11
+    build:
+      context: ..
+      dockerfile: Database.Dockerfile
+    image: catwaf-fixture-database
     container_name: booknook_db
     restart: unless-stopped
     expose:
       - "3306"
-    environment:
-      MARIADB_ROOT_PASSWORD: fixture-only-not-a-real-secret
-      MARIADB_DATABASE: booknook
     networks:
       - booknook
     security_opt:

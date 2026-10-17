@@ -130,13 +130,9 @@ function refresh({ force = false } = {}) {
       return { ok: false, error: e.message }
     }
 
-    try {
-      configLock.atomicWriteFileSync(caddySvc.CADDYFILE_PATH, next, { mode: 0o644 })
-    } catch (e) {
-      return { ok: false, error: e.message }
-    }
-
-    const reload = caddySvc.reloadCaddy()
+    const tx = require('./configTx').apply({ label: 'edge-bans.refresh', caddyfile: next, render: false, mutate: () => {} })
+    if (!tx.ok) return tx
+    const reload = { reloaded: tx.reloaded, error: tx.reloadError }
     // The content is committed either way; whether it is ENFORCED decides
     // if the next tick may short-circuit.
     db_set(LAST_KEY, { hash: hash2, needsReload: !reload.reloaded })

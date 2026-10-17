@@ -470,14 +470,19 @@ async function cmdBackup(positional, flags) {
       console.error(c('Usage: catwaf backup restore <backup.json> [--db] [--allow-redacted] [--confirm-db-restore]', C.yellow))
       return 1
     }
-    const result = backups.restoreFromFile(file, {
+    let result = backups.restoreFromFile(file, {
       restoreDatabase: !!flags.db,
       allowRedacted: !!flags['allow-redacted'],
     })
     if (!result.ok && result.database?.requires_stopped_services && flags['confirm-db-restore']) {
       const confirmed = backups.confirmDatabaseRestore(file)
-      result.database = confirmed.ok ? { ok: true, restored: confirmed.restored } : confirmed
-      result.ok = true
+      result = confirmed.ok
+        ? { ...backups.restoreFromFile(file, { allowRedacted: !!flags['allow-redacted'] }), database: confirmed }
+        : { ok: false, error: confirmed.error, restored_from: file, database: confirmed }
+      if (result.ok) {
+        result.database.requires_config_apply = false
+        result.database.instruction = 'Database and matching configuration restored. Historical sessions were revoked. Services can now be restarted.'
+      }
     }
     if (!out(result, flags.json)) {
       if (!result.ok) { console.error(c('✗ ' + (result.detail || result.error), C.red)); return 1 }

@@ -8,6 +8,7 @@ const caddySvc = require('./caddy')
 const rulesSvc = require('./rules')
 const requestLog = require('./requestLog')
 const configTx = require('./configTx')
+const edition = require('./edition')
 
 const HEALTHY = 'healthy'
 const DEGRADED = 'degraded'
@@ -36,12 +37,15 @@ async function collect() {
   const checks = []
   const add = (name, status, detail, hint) => checks.push({ name, status, detail: detail || null, hint: hint || null })
 
+  const lite = edition.isLite()
   const apiPort = Number(process.env.PORT || 8000)
   const apiHost = process.env.HOST || '127.0.0.1'
-  const apiUp = await checkPort(apiPort, apiHost === '0.0.0.0' ? '127.0.0.1' : apiHost)
-  add('CatWAF API', apiUp ? HEALTHY : DEGRADED,
-    apiUp ? `listening on ${apiHost}:${apiPort}` : `nothing listening on ${apiHost}:${apiPort}`,
-    apiUp ? null : 'Start CatWAF with `catwaf start`. The WAF itself keeps filtering without the API, but the dashboard and CLI status will not work.')
+  if (!lite) {
+    const apiUp = await checkPort(apiPort, apiHost === '0.0.0.0' ? '127.0.0.1' : apiHost)
+    add('CatWAF API', apiUp ? HEALTHY : DEGRADED,
+      apiUp ? `listening on ${apiHost}:${apiPort}` : `nothing listening on ${apiHost}:${apiPort}`,
+      apiUp ? null : 'Start CatWAF with `catwaf start`. Core WAF filtering is independent; enabled runtime enforcement and upload scanning require the API.')
+  }
 
   const caddyRunning = caddySvc.isCaddyRunning()
   add('Caddy', caddyRunning ? HEALTHY : UNHEALTHY,
@@ -78,17 +82,15 @@ async function collect() {
       writable ? null : 'WAF changes will fail. Run as a user that can write it, or set CADDYFILE_PATH.')
 
     const body = fs.readFileSync(cfPath, 'utf8')
-const hasBlock = body.includes('@@CATWAF_WAF_START@@')
-const hasAutoBlock = body.includes('@@CATWAF_AUTO_START@@') && /@@CATWAF_AUTO_START@@[\s\S]*?coraza_waf/.test(body)
-const hasCoraza = /(^|\n)\s*coraza_waf\s*\{/.test(body)
-const hasOrder = /order\s+coraza_waf\s+first/.test(body)
-const intercepting = (hasBlock || hasAutoBlock || hasCoraza) && hasOrder && state.WAF.engine !== 'Off'
-    add('WAF interception', intercepting ? HEALTHY : (hasBlock ? DEGRADED : UNHEALTHY),
-      !hasBlock ? 'no CatWAF WAF block in the Caddyfile'
+    const hasCoraza = /(^|\n)\s*coraza_waf\s*\{/.test(body)
+    const hasOrder = /order\s+coraza_waf\s+first/.test(body)
+    const blocking = hasCoraza && hasOrder && state.WAF.engine === 'On'
+    add('WAF interception', blocking ? HEALTHY : UNHEALTHY,
+      !hasCoraza ? 'no Coraza handler in the Caddyfile'
         : !hasOrder ? 'missing `order coraza_waf first` — requests can bypass Coraza'
-        : state.WAF.engine === 'Off' ? 'engine is Off — nothing is inspected'
-        : `engine ${state.WAF.engine} at paranoia level ${state.WAF.paranoia_level}`,
-      intercepting ? null : 'Apply any WAF setting to regenerate the block, and confirm `order coraza_waf first` is in the global options.')
+        : state.WAF.engine !== 'On' ? `engine is ${state.WAF.engine} — attacks are not blocked`
+        : `configured engine On at paranoia level ${state.WAF.paranoia_level}; live blocking requires a request probe`,
+      blocking ? null : 'Apply WAF engine On to regenerate the block, and confirm `order coraza_waf first` is in the global options.')
   }
 
   let dbOk = false, dbDetail = null
@@ -101,6 +103,13 @@ const intercepting = (hasBlock || hasAutoBlock || hasCoraza) && hasOrder && stat
     dbOk ? null : 'Check DB_DIR/DB_PATH permissions.')
 
   if (dbOk) {
+    try {
+      configTx.assertReady()
+      if (fs.existsSync(configTx.journalPath())) throw new Error('A configuration transaction journal still needs recovery.')
+      add('Configuration recovery', HEALTHY, 'no pending database restore or configuration transaction')
+    } catch (e) {
+      add('Configuration recovery', UNHEALTHY, e.message, 'Complete recovery before starting services or applying further changes; see docs/security-recovery.md.')
+    }
     try {
       const cols = db.getDb().prepare('PRAGMA table_info(request_log)').all().map(c => c.name)
       const missing = ['ts', 'action', 'attack_type', 'rule_ids', 'severity', 'reason'].filter(c => !cols.includes(c))
@@ -142,19 +151,20 @@ const intercepting = (hasBlock || hasAutoBlock || hasCoraza) && hasOrder && stat
 
   const distIndex = path.join(__dirname, '..', '..', 'frontend', 'dist', 'index.html')
   const built = fs.existsSync(distIndex)
-  add('Dashboard', built ? HEALTHY : DEGRADED,
-    built ? 'build present' : 'not built',
-    built ? null : 'Run `npm run build`. Not required if you only use the WAF and CLI (minimal install).')
+  if (!lite) {
+    add('Dashboard', built ? HEALTHY : DEGRADED,
+      built ? 'build present' : 'not built',
+      built ? null : 'Run `npm run build`.')
+  }
 
-  const adminReachable = await (async () => {
-    try {
-      const u = new URL(caddySvc.CADDY_ADMIN_URL)
-      return await checkPort(Number(u.port || 2019), u.hostname)
-    } catch { return false }
-  })()
-  add('Caddy admin API', adminReachable ? HEALTHY : (caddyRunning ? DEGRADED : HEALTHY),
-    adminReachable ? `reachable at ${caddySvc.CADDY_ADMIN_URL}` : `not reachable at ${caddySvc.CADDY_ADMIN_URL}`,
-    adminReachable || !caddyRunning ? null : 'CatWAF falls back to the local `caddy reload` binary. Only needed when CatWAF runs in a container.')
+  // Exercise the same HTTP endpoint and Unix socket used by config reloads.
+  // An open TCP port is not proof of a working Caddy admin API, and probing
+  // localhost:2019 in Docker misdiagnoses the permissioned socket deployment.
+  const adminReachable = caddySvc.isAdminReachable()
+  const adminEndpoint = caddySvc.CADDY_ADMIN_SOCKET || caddySvc.CADDY_ADMIN_URL
+  add('Caddy admin API', adminReachable ? HEALTHY : UNHEALTHY,
+    adminReachable ? `responding at ${adminEndpoint}` : `not responding at ${adminEndpoint}`,
+    adminReachable ? null : 'Reload and recovery require this endpoint. Check Caddy and the configured socket permissions or admin address.')
 
   return checks
 }

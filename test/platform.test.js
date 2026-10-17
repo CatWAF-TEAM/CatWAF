@@ -219,7 +219,10 @@ const auth = require(path.join(ROOT, 'backend/middleware/auth.js'))
   section('no docker socket dependency anywhere')
   const compose = fs.readFileSync(path.join(ROOT, 'docker-compose.yml'), 'utf8')
   check('docker-compose.yml does not mount the docker socket', !compose.includes('/var/run/docker.sock'))
-  check('docker-compose.yml points the backend at the caddy admin API', compose.includes('CADDY_ADMIN_URL'))
+  const composeConfig = require('js-yaml').load(compose)
+  check('backend uses the private Caddy admin socket', composeConfig.services.backend.environment.CADDY_ADMIN_SOCKET === '/run/catwaf-admin/admin.sock')
+  check('origin cannot mount the Caddy admin socket', !(composeConfig.services['test-app'].volumes || []).some(v => String(v).includes('caddy-admin')))
+  check('dashboard HTTP listener is loopback-only', composeConfig.services.caddy.ports.includes('127.0.0.1:8081:8081'))
   // The vulnerable demo app is the protected site's ORIGIN (:8082). It is
   // published so the origin port is addressable for local inspection and so
   // the WAF-vs-no-WAF difference can be demonstrated — but only on loopback,

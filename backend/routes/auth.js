@@ -7,7 +7,7 @@ const router = express.Router()
 
 const {
   USERS, JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE,
-  loginRateLimit, clearLoginAttempts, needsBootstrap,
+  loginRateLimit, clearLoginAttempts, needsBootstrap, findUser,
 } = require('../middleware/auth')
 const auditSvc = require('../services/audit')
 const passwordHash = require('../services/passwordHash')
@@ -37,7 +37,8 @@ router.post('/api/auth/login', loginRateLimit, async (req, res, next) => {
     return res.status(400).json({ detail: 'Invalid credentials' })
   }
 
-  const u = USERS.find(x => x.username === username)
+  let u = USERS.find(x => x.username === username)
+  const verifiedHash = u?.password_hash
 
   let ok
   try {
@@ -55,6 +56,14 @@ router.post('/api/auth/login', loginRateLimit, async (req, res, next) => {
     auditSvc.audit({ user: { username: 'anonymous' }, ip: req.ip }, 'auth.login-failed', String(username || '').slice(0, 64))
     return res.status(401).json({ detail: 'Invalid credentials' })
   }
+
+  // Password comparison runs in a worker. A reset, deletion or demotion
+  // during that await must be observed before issuing fresh credentials.
+  const live = findUser(username, { fresh: true })
+  if (!live || live.id !== u.id || live.password_hash !== verifiedHash) {
+    return res.status(401).json({ detail: 'Invalid credentials' })
+  }
+  u = live
 
   // Second factor (idea #49). The password check has already succeeded, so
   // a missing code is answered with a distinct code the client can act on
@@ -97,7 +106,7 @@ router.post('/api/auth/login', loginRateLimit, async (req, res, next) => {
     },
   )
 
-  sessionSvc.open({ jti, user: u, req })
+  sessionSvc.open({ jti, user: u, req, expiresAt: jwt.decode(token).exp * 1000 })
 
   auditSvc.audit({ user: u, ip: req.ip }, 'auth.login', u.username, { totp: totp.isEnabled(u.username) })
 
@@ -149,7 +158,7 @@ router.get('/api/handshake', (req, res) => {
   // Fail closed on any non-positive answer — a falsy or shapeless return
   // means "could not confirm the session is live", and this endpoint hands
   // out the gate path, so that must never mean "here you go".
-  if (!check || check.ok === false) {
+  if (!check || check.ok !== true) {
     return res.status(401).json({ detail: (check && check.detail) || 'This session could not be verified. Log in again.', code: (check && check.code) || 'SESSION_UNVERIFIED' })
   }
   res.json({ api: currentSegment(), user: { username: req.user.username, role: req.user.role } })

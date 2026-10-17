@@ -118,9 +118,7 @@ function clientIp(req) {
   // CatWAF, so it is authoritative here. X-Forwarded-For is deliberately not
   // consulted — its first entry is visitor-controlled, and trusting it let a
   // banned or rate-limited client rotate identity per request.
-  const real = req.headers?.['x-real-ip'] || req.headers?.['x-catwaf-client-ip']
-  if (real) return normalizeClientIp(String(real).split(',')[0].trim())
-  return normalizeClientIp(req.ip || '')
+  return require('../gatewayIdentity').clientIp(req)
 }
 
 // ─── Scoping (#4) ───────────────────────────────────────────────────────

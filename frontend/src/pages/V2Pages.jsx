@@ -293,7 +293,7 @@ export function AlertsV2Page() {
       <div className="flex items-center gap-3 mb-6">
         <div className="stat-icon accent"><Bell size={18}/></div>
         <div>
-          <h1 className="text-lg font-bold text-cat-text">Alerts & Notifications</h1>
+          <h1 className="text-lg font-bold text-cat-text">Alerts &amp; Notifications</h1>
           <p className="text-xs text-cat-sub">Get notified on Discord, Slack, Telegram, or webhooks</p>
         </div>
       </div>

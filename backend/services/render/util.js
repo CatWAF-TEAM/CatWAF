@@ -15,6 +15,50 @@ const fs = require('fs')
 const path = require('path')
 
 const db = require('../db')
+let previewDepth = 0
+let generation = null
+
+// Each render writes to an immutable generation. A rejected candidate can
+// never overwrite files still referenced by the running Caddy instance.
+function withAssetGeneration(fn, id = require('crypto').randomUUID()) {
+  if (generation) return fn()
+  generation = id
+  try { return fn() } finally { generation = null }
+}
+
+function generationDir(id) {
+  if (!/^[a-zA-Z0-9-]+$/.test(id)) throw new Error('Invalid asset generation')
+  return path.join(path.dirname(db.DB_PATH), 'caddy', 'generations', id)
+}
+
+function discardGeneration(id) {
+  const dir = generationDir(id)
+  // id is a single validated path component under the fixed generation root.
+  fs.rmSync(dir, { recursive: true, force: true })
+}
+
+function syncGeneration(id) {
+  if (process.platform === 'win32' || previewDepth) return
+  const dir = generationDir(id)
+  if (!fs.existsSync(dir)) return
+  function syncTree(current) {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (entry.isDirectory()) syncTree(path.join(current, entry.name))
+    }
+    const fd = fs.openSync(current, 'r')
+    try { fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+  }
+  syncTree(dir)
+  for (const current of [path.dirname(dir), path.dirname(path.dirname(dir)), path.dirname(db.DB_PATH)]) {
+    const fd = fs.openSync(current, 'r')
+    try { fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+  }
+}
+
+function withoutAssetWrites(fn) {
+  previewDepth++
+  try { return fn() } finally { previewDepth-- }
+}
 
 function q(value) {
   return `"${String(value)}"`
@@ -35,8 +79,12 @@ function dur(seconds) {
 }
 
 function assetDir(...parts) {
-  const dir = path.join(path.dirname(db.DB_PATH), 'caddy', ...parts)
-  fs.mkdirSync(dir, { recursive: true, mode: 0o750 })
+  // The runtime cache is mutable state, not a generated configuration asset.
+  const base = parts[0] === 'cache' || !generation
+    ? path.join(path.dirname(db.DB_PATH), 'caddy')
+    : generationDir(previewDepth ? 'preview' : generation)
+  const dir = path.join(base, ...parts)
+  if (!previewDepth) fs.mkdirSync(dir, { recursive: true, mode: 0o750 })
   return dir
 }
 
@@ -49,15 +97,16 @@ function writeAsset(relPath, content, { mode = 0o640 } = {}) {
   const name = parts.pop()
   const dir = assetDir(...parts)
   const full = path.join(dir, name)
+  if (previewDepth) return full
   try {
     if (fs.readFileSync(full, 'utf8') === content) return full
   } catch { /* not written yet */ }
-  fs.writeFileSync(full, content, { mode })
-  try { fs.chmodSync(full, mode) } catch {}
+  require('../configLock').atomicWriteFileSync(full, content, { mode })
   return full
 }
 
 function removeAsset(relPath) {
+  if (previewDepth) return
   try { fs.unlinkSync(path.join(assetDir(...relPath.split('/').slice(0, -1)), relPath.split('/').pop())) } catch {}
 }
 
@@ -86,4 +135,4 @@ function block(header, lines, level = 0) {
   return [`${header} {`, ...indent(body, 1), '}'].map(l => '    '.repeat(level) + l)
 }
 
-module.exports = { q, indent, dur, assetDir, writeAsset, removeAsset, escapeRegex, stripBraces, m, block }
+module.exports = { q, indent, dur, assetDir, writeAsset, removeAsset, escapeRegex, stripBraces, m, block, withoutAssetWrites, withAssetGeneration, generationDir, discardGeneration, syncGeneration }

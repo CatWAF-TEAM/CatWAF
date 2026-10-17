@@ -1,5 +1,13 @@
 # Installation
 
+Use Node 22.16+ on the 22 LTS line, or Node 24+. Offline database restore uses
+the built-in SQLite backup API. `node scripts/ensure-caddy.js` obtains the
+existing upstream Caddy/Coraza dependency and validates it before installation.
+CatWAF application code remains Node.js; there is no local Go application,
+vendored engine, or patched Go runtime. Docker retains the original upstream
+xcaddy integration with security version pins.
+See [security-recovery.md](security-recovery.md) before restoring or upgrading.
+
 ## Choose an edition first
 
 Everything below depends on this choice. It is written to `.env` as
@@ -46,7 +54,7 @@ domain settings and admin accounts.
 Download it, read it, then run it:
 
 ```bash
-curl -fsSLo setup.sh https://raw.githubusercontent.com/agugusgeyehe-dot/catwaf/main/setup.sh
+curl -fsSLo setup.sh https://raw.githubusercontent.com/CatWAF-TEAM/CatWAF/release-1.0.1/setup.sh
 less setup.sh
 sudo bash setup.sh --lite      # or --full, or omit for an interactive menu
 ```
@@ -83,7 +91,7 @@ see [SECURITY.md](../SECURITY.md#installer-trust-model).
 ## Docker (fastest path)
 
 ```bash
-git clone https://github.com/agugusgeyehe-dot/catwaf
+git clone https://github.com/CatWAF-TEAM/CatWAF.git catwaf
 cd catwaf
 cp .env.example .env   # then set JWT_SECRET — see the file for how
 docker compose up --build
@@ -131,7 +139,7 @@ If you'd rather not build Go binaries locally, do this step in Docker — the mo
 ## 2. Clone and install
 
 ```bash
-git clone https://github.com/agugusgeyehe-dot/catwaf
+git clone https://github.com/CatWAF-TEAM/CatWAF.git catwaf
 cd catwaf
 
 # Lite
@@ -187,7 +195,7 @@ npm start       # production
 
 `npm run dev` starts the backend API and the frontend dev server, and also starts Caddy fronting `:8081`/`:8000` with a dev-only Coraza WAF block if a Caddy build with the Coraza module is available (`npm install` fetches one automatically) — see `scripts/dev.js`. The backend and Vite quietly move to internal ports in that case; you still use `:8081`/`:8000` as shown below. If no working Caddy is found, it says so and falls back to the backend and Vite talking directly with no WAF in the loop.
 
-If CatAI is enabled, both commands first make sure Ollama is running and the model is downloaded and warm, so the assistant is ready the moment you open the dashboard. This adds a few seconds on the very first run (downloading the model) and under two seconds after that.
+If CatAI is enabled, both commands check Ollama, pull a missing model, and attempt to warm it before starting the dashboard. The first pull needs network access and can take substantially longer than a normal startup. If Ollama cannot start or the pull fails, the dashboard still starts and CatAI reports itself unavailable. See the [CatAI guide](catai.md) for the default local endpoint and the privacy effect of changing `OLLAMA_URL`.
 
 | Service | URL |
 |---|---|

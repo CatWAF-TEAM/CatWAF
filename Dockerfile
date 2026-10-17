@@ -6,8 +6,25 @@
 # be downgraded to save size the way a lot of "just needs Express" Dockerfiles
 # do.
 
-FROM node:22-slim AS base
+# The offline restore and transaction paths must validate before activating
+# configuration, even while the separate Caddy service is stopped.
+FROM caddy:2.11.7-builder@sha256:d842facfd63b960922e57444ff76fd8f0793a66dfdcf481af8026e1f4e6a39b4 AS caddy-build
+WORKDIR /build
+ENV GOTOOLCHAIN=go1.26.9 CGO_ENABLED=0
+# Retain symbols so vulnerability scanners can inspect package reachability.
+ENV XCADDY_GO_BUILD_FLAGS="-trimpath -tags=nobadger,nomysql,nopgx"
+# Original upstream xcaddy integration, with security version pins only.
+RUN xcaddy build v2.11.7 --output /usr/bin/caddy \
+    --with github.com/corazawaf/coraza-caddy/v2@v2.6.2 \
+    --with golang.org/x/net/http2@v0.61.0 \
+    --with golang.org/x/crypto/cryptobyte@v0.58.0
+
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
 WORKDIR /app
+COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
+# Apply distribution fixes newer than the base image. OpenSSL supports
+# legacy encrypted backup import and Cloudflare certificate requests.
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 LABEL org.opencontainers.image.title="CatWAF" \
       org.opencontainers.image.description="Web application firewall built on Caddy + Coraza + OWASP CRS" \
@@ -17,8 +34,7 @@ LABEL org.opencontainers.image.title="CatWAF" \
 
 # This image is the API server only. Caddy (with Coraza) and the built
 # dashboard live in docker/Caddy.Dockerfile, so:
-#   CATWAF_SKIP_CADDY_DOWNLOAD  stops postinstall fetching a Caddy binary that
-#                               would never be executed here.
+#   CATWAF_SKIP_CADDY_DOWNLOAD  uses the validated binary copied above.
 #   CATWAF_EDITION=full         this container provides the HTTP API. frontend/
 #                               is deliberately not copied, and postinstall
 #                               detects that and skips the dashboard install.
@@ -31,7 +47,10 @@ ENV CATWAF_SKIP_CADDY_DOWNLOAD=1 \
 COPY package.json package-lock.json* ./
 COPY scripts ./scripts
 COPY backend/services/env.js ./backend/services/env.js
-RUN npm install --omit=dev --omit=optional && npm cache clean --force
+RUN npm ci --omit=dev --omit=optional && npm cache clean --force
+# Runtime containers execute Node directly. Package-manager dependencies
+# need not remain in the deployed image; rebuild images to install updates.
+RUN rm -rf /usr/local/lib/node_modules /opt/yarn* /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 # Now the actual application code.
 COPY backend ./backend
@@ -67,6 +86,8 @@ ENV PORT=8000
 # is published.
 ENV HOST=0.0.0.0
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||8000)+'/healthz',{signal:AbortSignal.timeout(4000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
 # --experimental-sqlite is required until node:sqlite graduates out of
 # experimental status — same flag package.json's own "dev:backend" script

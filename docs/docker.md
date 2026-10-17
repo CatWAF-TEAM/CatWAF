@@ -46,7 +46,8 @@ docker compose exec -e CATWAF_USER_PASSWORD='…' backend \
   node bin/catwaf.js user add admin --role admin
 ```
 
-Then open <http://localhost> and sign in.
+Then open <http://localhost:8081> and sign in. For remote administration use an
+authenticated tunnel or configure HTTPS; the shipped HTTP dashboard is loopback-only.
 
 ## Architecture
 
@@ -69,7 +70,7 @@ Three containers, matching how CatWAF already works outside Docker (see
 | `:8081` | CatWAF's admin dashboard — the control panel SPA plus its `/api` and `/g` routes. Kept off `:80` so it can never collide with the site being protected. |
 | `:8082` | The protected website's own origin, bound to `127.0.0.1` only. Reaching it directly **bypasses the WAF** — it exists for local inspection and for demonstrating the difference, not as a way in. |
 | `:8000` | The backend API, published on loopback for healthchecks. The dashboard reaches it through Caddy. |
-| `:2019` | Caddy's admin API. Never published; internal compose network only. |
+| Unix socket | Caddy's admin API at `/run/catwaf-admin/admin.sock`; no TCP listener. |
 
 - **`backend`** — the Node API (`Dockerfile` at the repo root). Owns the
   SQLite database (`catwaf-data` volume) and writes WAF config changes into
@@ -137,23 +138,24 @@ anything that can execute commands inside the backend container could, via
 that socket, control every other container and in practice the host itself.
 For a security product that was the wrong trade to ask anyone to make.
 
-CatWAF now reloads Caddy over **Caddy's own HTTP admin API**:
+CatWAF reloads Caddy over **HTTP on a permissioned Unix socket**:
 
-- `caddy` listens on `0.0.0.0:2019` inside the compose network
-  (see `docker/Caddyfile`).
-- Port 2019 is deliberately **not** in the `caddy` service's `ports:` list,
-  so it is reachable only from sibling containers, never from the host or
-  the internet.
-- `backend` is pointed at it with `CADDY_ADMIN_URL: http://caddy:2019`.
+- `caddy` listens on `unix//run/catwaf-admin/admin.sock|0660`.
+- Only Caddy and the backend mount the socket volume. The origin container
+  cannot connect to the configuration API over the compose network.
+- `backend` uses `CADDY_ADMIN_SOCKET=/run/catwaf-admin/admin.sock`.
 - `backend/services/caddy.js` prefers a local `caddy reload` when the binary
-  is present (the normal non-Docker case) and falls back to `POST /load` on
-  the admin API (the container case). It contains no Docker calls at all.
+  is present and falls back to `POST /load` on the admin API. The backend
+  image includes the same locked Caddy binary for offline validation. It
+  contains no Docker calls at all.
 
 Both containers also run with `no-new-privileges:true`.
 
-If you expose the admin API more widely than the compose network, secure it
-yourself — Caddy's admin API is unauthenticated by design and assumes a
-trusted local interface.
+Socket ownership and group permissions are the access control. Do not mount
+this volume into application containers. Caddy's API has no application login.
+Existing named volumes keep their old Caddyfile and permissions across image
+rebuilds: follow the [security migration notes](security-audit-2026-10-16.md)
+when upgrading an existing stack.
 
 ## Hardening
 
@@ -168,6 +170,14 @@ of `no-new-privileges:true`:
   requires `NET_BIND_SERVICE`; that single capability is granted back after
   dropping all others. Caddy is deliberately *not* run read-only, since it
   writes certificates and live config to its volumes.
+- **Separate service identities** — backend runs as UID 1000; Caddy runs as
+  UID 1001 with shared group 1000. Never change Caddy to UID 1000: that would
+  let it read the backend's owner-only database through the asset mount.
+- **Health checks** — backend checks `/healthz`, Caddy checks its local
+  dashboard listener, and the demo checks its HTTP listener. These are liveness
+  checks; the separate isolation test verifies actual WAF blocking.
+- **Demo containment** — the demo uses a read-only root filesystem, no Linux
+  capabilities and a temporary `/tmp` mount.
 - **`tmpfs: [/tmp]` on `backend`** — `/tmp` becomes an in-memory mount instead
   of persistent storage in the container's writable layer.
 - **JSON log rotation** on `backend` and `caddy` (`max-size: 10m`,
@@ -175,9 +185,16 @@ of `no-new-privileges:true`:
 
 ## Data & config persistence
 
-Two named volumes:
+Named volumes:
 
 - `catwaf-data` → `/app/data` in `backend` — the SQLite database.
+  Also mounted read-only into Caddy for generated assets; the database itself is mode 0600.
+- `caddy-admin` → `/run/catwaf-admin` in Caddy and backend — the admin socket.
+- `caddy-data` → `/data` in Caddy only — certificate private keys, ACME
+  accounts and the internal CA. Preserve and back up this volume.
+- `caddy-runtime-config` → `/config` in Caddy only — saved runtime
+  configuration. The managed Caddyfile remains in `caddy-config`.
+- `coraza-logs` → `/var/log/coraza` in Caddy and backend — sensitive audit logs.
 - `caddy-config` → `/etc/caddy` in both `backend` and `caddy` — the live
   Caddyfile and Coraza list directory. Seeded from `docker/Caddyfile` the
   first time the volume is created (standard Docker behavior — an empty
@@ -186,9 +203,20 @@ Two named volumes:
   your edits and CatWAF's applied WAF changes persist across
   `docker compose restart` / `down` / `up`.
 
-To reset back to the baked-in default Caddyfile: `docker compose down -v`
-(removes the volumes entirely, including your database — back it up first
-via the dashboard's Snapshots feature if you want to keep your WAF config).
+`docker compose down` preserves these named volumes. `docker compose down -v`
+destroys all of them, including the database and TLS identities. Configuration
+snapshots do not back up certificate private keys or the entire event database;
+use the database backup/restore procedure and separate volume backups.
+
+**Upgrading an existing stack:** before recreating Caddy with the new named
+volumes, stop Caddy and copy its existing `/data` and `/config` contents to
+private backups (`docker cp` works with a stopped container). Inspect its
+mounts with `docker inspect` to locate any old anonymous volumes. Restore the
+contents into the new volumes, preserving paths, before starting Caddy; set
+their ownership to UID 1001 / GID 1000. Keep the old container/volumes and backups
+until HTTPS and certificate fingerprints are verified. Mounting new empty
+volumes without migrating the old data replaces the TLS identity and can cause
+unnecessary certificate issuance. Never mount these volumes into the origin.
 
 ## Building without Compose
 
@@ -199,3 +227,15 @@ docker build -t catwaf-caddy -f docker/Caddy.Dockerfile .
 
 Useful if you're integrating these images into an existing orchestration
 setup rather than using this repo's compose file directly.
+
+Runtime images use Node 24 on Alpine and omit npm/yarn. Install dependencies and
+build the dashboard when building images, rather than running the native setup
+wizard inside a container. Database restore uses a stopped-stack, one-shot
+backend container; see [security-recovery.md](security-recovery.md).
+
+When upgrading existing volumes from the root-running Caddy image, stop and
+back up the stack first. Preserve certificate storage, and set the ownership
+of Caddy's `/data` and `/config` contents to UID 1001 / GID 1000. Shared
+configuration, audit-log and admin-socket directories need group 1000 and the
+documented setgid permissions. Do not change the database ownership or make it
+group-readable. Image rebuilds do not repair existing volume ownership.

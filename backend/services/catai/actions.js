@@ -13,12 +13,10 @@ function countryNameFor(cc) {
 const DIRECTION = { STRENGTHEN: 'strengthen', WEAKEN: 'weaken' }
 
 function commit(req, label, target, meta) {
-  // The mutation is already applied to state.WAF by the caller; updateWAF
-  // re-reads committed state under the config lock first, so a concurrent
-  // CLI change cannot be silently reverted by this persist.
-  const { sync } = state.updateWAF(() => {}, { label, req, syncCaddy: true })
-  auditSvc.audit(req, 'catai.apply', target, { action: label, ...meta, caddy_reloaded: sync.reloaded })
-  return { caddy_reloaded: sync.reloaded, caddy_error: sync.error || null }
+  // apply() owns the transaction, including this audit entry. Action
+  // handlers must never persist a partially changed state before validation.
+  auditSvc.audit(req, 'catai.apply', target, { action: label, ...meta })
+  return {}
 }
 
 const TOOL_SCHEMAS = {
@@ -390,7 +388,13 @@ function prepare(id, params, req) {
 function apply(id, params, req) {
   const prepared = prepare(id, params, req)
   if (!prepared.ok) return prepared
-  const result = ACTIONS[id].apply(req, params || {})
+  const tx = require('../configTx').apply({ label: 'catai.apply', req, mutate: () => {
+    const fresh = prepare(id, params, req)
+    if (!fresh.ok) throw new Error(fresh.error)
+    return ACTIONS[id].apply(req, params || {})
+  } })
+  if (!tx.ok) return { ...tx, actionId: id }
+  const result = tx.result
   return {
     ok: true,
     actionId: id,
@@ -399,8 +403,8 @@ function apply(id, params, req) {
     label: prepared.label,
     message: ACTIONS[id].describe(params || {}),
     prev: result.prev,
-    caddy_reloaded: result.caddy_reloaded,
-    caddy_error: result.caddy_error,
+    caddy_reloaded: tx.reloaded,
+    caddy_error: tx.reloadError,
   }
 }
 

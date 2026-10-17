@@ -45,7 +45,7 @@ const log = logger.child('gateway')
 // be reachable pre-auth), so they carry their own. Without one, an anonymous
 // flood of challenge pages pays SVG+HTML generation and grows server state
 // per request.
-const clientKey = req => normalizeClientIp(req.ip || '') || 'unknown'
+const clientKey = req => require('../services/gatewayIdentity').clientIp(req) || 'unknown'
 const challengeGetLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
@@ -80,9 +80,7 @@ function forwardedIp(req) {
   // CatWAF (enforce, challenge, upload gate). Sniffing X-Forwarded-For here
   // was removed deliberately: its leftmost entry is attacker-chosen, and a
   // visitor could rotate it per request to defeat bans and attempt counters.
-  const real = req.headers['x-catwaf-client-ip'] || req.headers['x-real-ip']
-  if (real) return normalizeClientIp(String(real).split(',')[0].trim())
-  return normalizeClientIp(req.ip || '')
+  return require('../services/gatewayIdentity').clientIp(req)
 }
 
 function forwardedUri(req) {
@@ -166,16 +164,19 @@ function uploadUpstreamAllowed(target) {
   const caddySvc = require('../services/caddy')
   let known = []
   try { known = caddySvc.currentSiteContext().upstreams || [] } catch { known = [] }
-  return known.some(u => String(u).replace(/^[a-z0-9]+:\/\//, '') === target)
+  // Return the configured scheme, not the caller's version: old rendered
+  // headers omitted https:// and must never silently downgrade to HTTP.
+  return known.find(u => String(u) === target || String(u).replace(/^https?:\/\//, '') === target) || null
 }
 
 // Only the headers the visitor sent travel onward; CatWAF's own control
 // headers are stripped so the origin never sees them.
 function forwardableHeaders(req, upstream) {
   const out = {}
+  const connectionHeaders = new Set(String(req.headers.connection || '').toLowerCase().split(',').map(s => s.trim()))
   for (const [name, value] of Object.entries(req.headers || {})) {
     const lower = name.toLowerCase()
-    if (HOP_BY_HOP.has(lower)) continue
+    if (HOP_BY_HOP.has(lower) || connectionHeaders.has(lower)) continue
     if (lower.startsWith('x-catwaf-')) continue
     if (lower === 'content-length' || lower === 'host') continue
     out[name] = value
@@ -205,6 +206,7 @@ function readBounded(req, cap) {
     req.on('data', onData)
     req.once('end', () => resolve({ buffer: Buffer.concat(chunks), truncated: false }))
     req.once('error', reject)
+    req.once('aborted', () => reject(new Error('Upload aborted')))
   })
 }
 
@@ -220,7 +222,8 @@ router.all('/api/upload-gate', async (req, res) => {
   const originalUri = String(req.headers['x-catwaf-upload-path'] || '/').slice(0, 2048)
   const ip = forwardedIp(req)
 
-  if (!upstream || !uploadUpstreamAllowed(upstream)) {
+  const configuredUpstream = upstream && uploadUpstreamAllowed(upstream)
+  if (!configuredUpstream || /^h2c:/i.test(configuredUpstream)) {
     log.error('Upload gate called with an upstream this instance does not proxy to', { upstream, ip })
     return res.status(502).json({ detail: 'Bad gateway' })
   }
@@ -291,41 +294,46 @@ router.all('/api/upload-gate', async (req, res) => {
   // Allowed through — forward to the origin and stream the response back.
   // A truncated body means the rest is still unread on the socket, so the
   // original framing headers are preserved and the remainder is piped.
-  const http = require('http')
-  const [host, port] = upstream.includes(':') ? upstream.split(':') : [upstream, '80']
-  const headers = forwardableHeaders(req, upstream)
+  let destination
+  try { destination = new URL(/^https?:\/\//.test(configuredUpstream) ? configuredUpstream : `http://${configuredUpstream}`) }
+  catch { return res.status(502).json({ detail: 'Bad gateway' }) }
+  if (!originalUri.startsWith('/') || /[\r\n\0]/.test(originalUri)) return res.status(400).json({ detail: 'Invalid upload path' })
+  const transport = destination.protocol === 'https:' ? require('https') : require('http')
+  const headers = forwardableHeaders(req, destination.host)
   if (truncated) {
     if (req.headers['content-length']) headers['content-length'] = req.headers['content-length']
-    if (req.headers['transfer-encoding']) headers['transfer-encoding'] = req.headers['transfer-encoding']
   } else {
     headers['content-length'] = String(body.length)
   }
 
-  const proxied = http.request({
-    host,
-    port: Number(port) || 80,
+  const proxied = transport.request({
+    host: destination.hostname.replace(/^\[|\]$/g, ''),
+    port: Number(destination.port) || (destination.protocol === 'https:' ? 443 : 80),
     method: req.method,
     path: originalUri,
     headers,
     timeout: 120_000,
   }, origin => {
     res.status(origin.statusCode || 502)
+    const connectionHeaders = new Set(String(origin.headers.connection || '').toLowerCase().split(',').map(s => s.trim()))
     for (const [name, value] of Object.entries(origin.headers || {})) {
-      if (!HOP_BY_HOP.has(name.toLowerCase())) res.set(name, value)
+      if (!HOP_BY_HOP.has(name.toLowerCase()) && !connectionHeaders.has(name.toLowerCase()) && value !== undefined) res.set(name, value)
     }
     if (scanned) res.set('X-CatWAF-Verdict', 'upload-clean')
     origin.pipe(res)
+    origin.on('error', () => res.destroy())
   })
 
   proxied.on('timeout', () => proxied.destroy(new Error('origin timed out')))
   proxied.on('error', e => {
     log.error('Could not forward a scanned upload to the origin', { error: e.message, upstream })
     if (!res.headersSent) res.status(502).json({ detail: 'Bad gateway' })
+    else res.destroy()
   })
+  res.on('close', () => { if (!res.writableFinished) proxied.destroy() })
 
   if (truncated) {
     proxied.write(body)
-    req.resume()
     req.pipe(proxied)
   } else {
     proxied.end(body)

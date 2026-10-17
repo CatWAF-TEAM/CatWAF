@@ -80,7 +80,7 @@ const SCHEMA = {
 
       // #48
       max_header_size_kb: {
-        type: 'int', min: 1, max: 1024, default: 0,
+        type: 'int', min: 0, max: 1024, default: 0,
         label: 'Max request header size (KB)',
         help: '0 leaves Caddy at its built-in default.',
       },
@@ -1051,7 +1051,7 @@ const SCHEMA = {
       },
       url: {
         type: 'str', default: '', maxLen: 512,
-        pattern: /^rediss?:\/\/[^\s]+$/, patternMessage: 'Must be a redis:// or rediss:// URL',
+        pattern: /^rediss?:\/\/(?:\[[a-fA-F0-9:]+\]|[A-Za-z0-9.-]+)(?::\d{1,5})?(?:\/\d+)?$/, patternMessage: 'Use redis:// or rediss://host:port/db without credentials; use the Password field',
         label: 'Redis URL',
       },
       password: { type: 'str', default: '', maxLen: 256, label: 'Password', writeOnly: true },

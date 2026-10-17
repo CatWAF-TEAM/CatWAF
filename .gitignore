@@ -17,6 +17,8 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 data/*.pid
+data/config-transaction.json
+data/caddy/
 *.sqlite
 *.sqlite3
 
@@ -95,3 +97,10 @@ CLAUDE-SECURITY-*/
 # Design notes kept alongside the code while a feature is being built.
 # Not part of the shipped project.
 catwaf-indev-ideas/
+
+# SQLite coordination sidecars and transaction staging
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+data/config.lock
+data/.restore-*

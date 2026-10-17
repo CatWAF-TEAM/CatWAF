@@ -5,7 +5,7 @@
 // part only the API can get wrong:
 //
 //   * the routes are reachable only through the signed, rotating admin path
-//   * protecting is admin-only, discovering and previewing are not
+//   * protecting, discovering and previewing all require an administrator
 //   * a preview never claims protection, and neither does the inventory
 //   * concurrent pipeline runs are refused rather than racing each other
 //   * the Caddyfile inventory reader reconstructs what apply.js wrote
@@ -17,6 +17,7 @@ const os = require('os'), fs = require('fs'), path = require('path')
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'catwaf-apps-'))
 process.env.DB_DIR = DIR
 process.env.JWT_SECRET = 'a'.repeat(64)
+process.env.CATWAF_SETUP_TOKEN = 'bootstrap-test-token-'.repeat(3)
 process.env.CADDYFILE_PATH = path.join(DIR, 'Caddyfile')
 process.env.CORAZA_AUDIT_LOG = path.join(DIR, 'logs', 'audit.json')
 
@@ -73,7 +74,7 @@ const server = app.listen(0, '127.0.0.1', async () => {
     return { status: res.status, json: j, text }
   }
 
-  await raw('POST', '/api/setup/account', { body: { username: 'owner', password: 'correct-horse-battery' } })
+  await raw('POST', '/api/setup/account', { headers: { 'X-CatWAF-Setup-Token': process.env.CATWAF_SETUP_TOKEN }, body: { username: 'owner', password: 'correct-horse-battery' } })
 
   async function session(username, password) {
     const login = await raw('POST', '/api/auth/login', { body: { username, password } })
@@ -153,24 +154,23 @@ const server = app.listen(0, '127.0.0.1', async () => {
   check('a viewer cannot discover (host probing is admin-only)', viewerDiscover.status === 403, viewerDiscover.status)
 
   section('concurrent runs are refused')
-  // The run lock is taken once discovery is under way. Without a Docker CLI
-  // discovery fails immediately, both requests return before either can hold
-  // the lock, and there is no concurrency left to observe — so this asserts
-  // nothing on a host without Docker rather than reporting a failure that is
-  // really "Docker is not installed here".
-  const [first, second] = await Promise.all([
-    admin.P('/api/apps/preview', {}),
-    admin.P('/api/apps/preview', {}),
-  ])
-  const discoveryRan = !/docker cli not found/i.test(first.json?.error || '')
-  if (!discoveryRan) {
-    console.log('  SKIP  no Docker CLI on this host — discovery never reaches the run lock.')
-  } else {
-    const statuses = [first.status, second.status].sort()
-    check('one run succeeds and the other is refused', statuses[0] === 200 && statuses[1] === 409, statuses)
-    const refused = first.status === 409 ? first : second
+  // Hold the first operation at a barrier. An empty Docker inventory can
+  // otherwise finish before the second HTTP request arrives.
+  const protectSvc = require(R + '/backend/services/proxy/protect')
+  const originalProtect = protectSvc.protect
+  let entered, release
+  const started = new Promise(resolve => { entered = resolve })
+  const pending = new Promise(resolve => { release = resolve })
+  protectSvc.protect = async () => { entered(); await pending; return { ok: true, stage: 'preview' } }
+  try {
+    const firstRequest = admin.P('/api/apps/preview', {})
+    await started
+    const refused = await admin.P('/api/apps/preview', {})
+    release()
+    const first = await firstRequest
+    check('one run succeeds and the other is refused', first.status === 200 && refused.status === 409, [first.status, refused.status])
     check('the refusal says what is already running', /already running/i.test(refused.json.detail || ''), refused.json)
-  }
+  } finally { release(); protectSvc.protect = originalProtect }
   const afterBusy = await admin.G('/api/apps')
   check('the busy flag clears again', afterBusy.json.busy === null, afterBusy.json.busy)
 

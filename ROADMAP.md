@@ -2,6 +2,11 @@
 
 CatWAF already does a lot — the goal from here isn't to add more features, it's to make the ones that exist solid enough that someone can trust them on a real site. Roughly in order:
 
+The Free edition's current [reliability baseline and release gates](docs/reliability-baseline.md)
+track the BunkerWeb comparison, measured fault tests, unresolved reload
+connection resets, audit-record loss across overlapping rotations, and the
+remaining module advisory. Reliability parity is not yet established.
+
 ## Shipped in 1.1.0 (unreleased)
 
 - [x] **Security hardening pass** — client-IP spoofing on the enforcement plane closed
@@ -17,11 +22,11 @@ CatWAF already does a lot — the goal from here isn't to add more features, it'
       opt-in nftables mirror for SYN-time drops.
 - [x] **Alert delivery (#74)** — spikes, new bans and engine changes delivered to
       Slack/Discord/Telegram/webhooks; cross-process cooldowns; refund-on-total-failure.
-- [x] **Anti-DDoS (#75)** — under-attack mode: challenge everyone, 2-second verdict cache.
+- [x] **Anti-DDoS (#75)** — under-attack mode: challenge everyone, per-request verdicts.
 - [x] **SIEM event stream (#76)** — JSONL to data/siem.jsonl (+ optional HTTP collector),
       exactly-once cursor across restarts.
 - [x] **`catwaf update` (#77)** — GitHub release check, daily-cached, CLI command + job.
-- [x] **Encrypted backups + restore path** — AES-256-CBC artifacts, list/prune aware,
+- [x] **Encrypted backups + restore path** — AES-256-GCM artifacts, list/prune aware,
       `catwaf backup restore` through the validate-and-rollback pipeline.
 - [x] **Attack Map rework** — flashing red points instead of large dark spheres;
       hover tooltips with per-location totals across 24h / 5d / 7d / 30d.
@@ -117,7 +122,7 @@ not because any of it is still outstanding.
 - [x] Centralized logging + error handling (v3.1-dev)
 - [x] Security score page (v3.1-dev)
 - [x] Dockerfile + docker-compose for a one-command local stack (v3.1-dev)
-- [x] OpenAPI/Swagger docs for the core endpoints (v3.1-dev)
+- [x] OpenAPI/Swagger contract for all 191 fixed operations, with method-level drift checks, schema validation and live response samples (security update 2026-10-17)
 - [x] Switch `services/caddy.js`'s reload mechanism from `docker exec` to Caddy's HTTP Admin API — the Docker socket mount is gone from `docker-compose.yml` entirely, and `caddy.js` contains no Docker calls (asserted by a test). See `docs/docker.md`.
 - [x] Real user/credential management — `catwaf user list|add|remove|passwd|role` plus `/api/users` endpoints, with server-side authorization, bcrypt hashing, and last-admin protection.
 - [x] A real test suite — `test/security.test.js` and `test/catai.test.js` now cover the request-signing scheme end to end and the whole deterministic half of CatAI, with no network or Ollama required.

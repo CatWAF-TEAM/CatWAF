@@ -34,8 +34,7 @@ function backupCaddyfile() {
   if (!fs.existsSync(src)) return null
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const dest = path.join(backupDir(), `Caddyfile.${stamp}`)
-  fs.copyFileSync(src, dest)
-  try { fs.chmodSync(dest, 0o600) } catch {}
+  fs.writeFileSync(dest, fs.readFileSync(src), { mode: 0o600, flag: 'wx' })
   pruneBackups()
   return dest
 }
@@ -90,132 +89,154 @@ function restoreWaf(snap) {
   db.setState('rule_categories', state.RULE_CATEGORIES)
 }
 
-function apply({ label, req = null, mutate, validate = null, reload = true }) {
-  // One writer at a time, across processes: snapshot → mutate → persist →
-  // render → validate → reload must never interleave with a CLI invocation
-  // or a scheduled job doing the same. patchWAFCaddyfile takes the same
-  // lock internally (re-entrant here), and atomicWriteFileSync guarantees a
-  // reader on another process never sees a torn Caddyfile.
+
+const assets = require('./render/util')
+const crypto = require('crypto')
+function journalPath() { return path.join(path.dirname(db.DB_PATH), 'config-transaction.json') }
+function syncDirectory(dir) {
+  if (process.platform === 'win32') return
+  const fd = fs.openSync(dir, 'r')
+  try { fs.fsyncSync(fd) } finally { fs.closeSync(fd) }
+}
+function removeJournal() {
+  fs.unlinkSync(journalPath())
+  syncDirectory(path.dirname(journalPath()))
+}
+function restoreFile(journal) {
+  if (journal.previous === null) {
+    if (fs.existsSync(caddySvc.CADDYFILE_PATH)) fs.unlinkSync(caddySvc.CADDYFILE_PATH)
+  } else configLock.atomicWriteFileSync(caddySvc.CADDYFILE_PATH, journal.previous, { mode: 0o640 })
+  syncDirectory(path.dirname(caddySvc.CADDYFILE_PATH))
+}
+
+// The marker is committed in the SAME SQLite transaction as the settings.
+// A crash before commit restores the prior Caddyfile; after commit retains
+// the new one. Old assets are immutable and remain available for rollback.
+function recoverLocked() {
+  if (!fs.existsSync(journalPath())) return { recovered: false }
+  const journal = JSON.parse(fs.readFileSync(journalPath(), 'utf8'))
+  if (journal.version !== 1 || !/^[a-f0-9-]{36}$/.test(journal.id) || journal.caddyfile !== caddySvc.CADDYFILE_PATH || !(journal.previous === null || typeof journal.previous === 'string')) {
+    throw new Error('Invalid configuration recovery journal; refusing to change configuration')
+  }
+  const committed = db.getState('config_tx_commit') === journal.id
+  if (!committed) {
+    restoreFile(journal)
+    if (journal.wasRunning) {
+      const result = caddySvc.reloadCaddy()
+      if (!result.reloaded) throw new Error('Configuration recovery needs a successful reload of the previous configuration: ' + result.error)
+    }
+    assets.discardGeneration(journal.id)
+  }
+  removeJournal()
+  state.reloadAllFromDb()
+  return { recovered: true, committed }
+}
+function recover() { return configLock.withConfigLock(recoverLocked) }
+function assertReady() {
+  if (db.getState('database_restore_pending')) throw new Error('Database restore is incomplete. Apply the matching backup manifest with catwaf backup restore <backup.json> before starting services.')
+}
+
+function apply({ label, req = null, mutate, validate = null, reload = true, caddyfile = null, render = true, completeDatabaseRestore = false }) {
   return configLock.withConfigLock(() => {
-  // Coraza opens SecAuditLog when the config is provisioned, so the audit
-  // log has to exist before `caddy validate` runs — otherwise every WAF
-  // change fails on a clean install. Idempotent.
-  const auditLog = caddySvc.ensureAuditLog()
-  if (!auditLog.ok) {
-    return { ok: false, phase: 'audit-log', error: auditLog.error }
-  }
-
-  const before = snapshotWaf()
-  const caddyfilePath = caddySvc.CADDYFILE_PATH
-  const hadCaddyfile = fs.existsSync(caddyfilePath)
-  const previousCaddyfile = hadCaddyfile ? fs.readFileSync(caddyfilePath, 'utf8') : null
-
-  let backup = null
-  try {
-    backup = backupCaddyfile()
-  } catch (e) {
-    return { ok: false, phase: 'backup', error: `Could not back up the Caddyfile: ${e.message}` }
-  }
-
-  const rollback = () => {
-    restoreWaf(before)
+    recoverLocked()
+    if (!completeDatabaseRestore) assertReady()
+    state.reloadAllFromDb()
+    const auditLog = caddySvc.ensureAuditLog()
+    if (!auditLog.ok) return { ok: false, phase: 'audit-log', error: auditLog.error }
+    const file = caddySvc.CADDYFILE_PATH
+    const previous = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
+    let backup
+    try { backup = backupCaddyfile() }
+    catch (error) { return { ok: false, phase: 'backup', error: error.message } }
+    const id = crypto.randomUUID()
+    const candidate = path.join(path.dirname(file), '.catwaf-candidate-' + id)
+    const conn = db.getDb()
+    const synchronous = conn.prepare('PRAGMA synchronous').get().synchronous
+    let phase = 'begin', published = false, reloadAttempted = false, transaction = false, journalWritten = false
+    let wasRunning = false
     try {
-      if (previousCaddyfile !== null) configLock.atomicWriteFileSync(caddyfilePath, previousCaddyfile, { mode: 0o644 })
-      else if (fs.existsSync(caddyfilePath)) fs.unlinkSync(caddyfilePath)
-    } catch {}
-  }
-
-  let mutateResult
-  try {
-    mutateResult = mutate(state)
-  } catch (e) {
-    rollback()
-    return { ok: false, phase: 'mutate', error: e.message, rolledBack: true, backup }
-  }
-
-  if (validate) {
-    const v = validate(state)
-    if (v && v.ok === false) {
-      rollback()
-      return { ok: false, phase: 'validate', error: v.error || 'validation failed', rolledBack: true, backup }
-    }
-  }
-
-  try {
-    db.setState('waf', state.WAF)
-    db.setState('rule_categories', state.RULE_CATEGORIES)
-  } catch (e) {
-    rollback()
-    return { ok: false, phase: 'persist', error: e.message, rolledBack: true, backup }
-  }
-
-  try {
-    caddySvc.patchWAFCaddyfile(state.WAF)
-  } catch (e) {
-    rollback()
-    return { ok: false, phase: 'render', error: e.message, rolledBack: true, backup }
-  }
-
-  const validation = validateCaddyfile(caddyfilePath)
-  if (!validation.ok) {
-    rollback()
-    auditSvc.audit(req, `${label}.rollback`, '', { reason: 'invalid config', error: validation.error })
-    return {
-      ok: false,
-      phase: 'caddy-validate',
-      error: validation.error,
-      rolledBack: true,
-      backup,
-      message: 'Configuration validation failed. CatWAF did not activate the new configuration. Previous configuration has been preserved.',
-    }
-  }
-
-  let reloaded = false
-  let reloadError = null
-  if (reload) {
-    const r = caddySvc.reloadCaddy()
-    reloaded = !!r.reloaded
-    reloadError = r.reloaded ? null : (r.error || 'reload failed')
-
-    if (!reloaded && caddySvc.isCaddyRunning()) {
-      rollback()
-      try { caddySvc.patchWAFCaddyfile(state.WAF) } catch {}
-      caddySvc.reloadCaddy()
-      auditSvc.audit(req, `${label}.rollback`, '', { reason: 'reload failed', error: reloadError })
-      return {
-        ok: false,
-        phase: 'reload',
-        error: reloadError,
-        rolledBack: true,
-        backup,
-        message: 'Caddy refused to reload the new configuration. CatWAF rolled back and restored the previous configuration.',
+      conn.exec('PRAGMA synchronous = FULL; BEGIN IMMEDIATE')
+      transaction = true
+      phase = 'mutate'
+      const result = mutate(state)
+      if (result && typeof result.then === 'function') throw new Error('Configuration mutations must be synchronous')
+      phase = 'validate'
+      const checked = validate ? validate(state) : null
+      if (checked && checked.ok === false) throw new Error(checked.error || 'validation failed')
+      phase = 'persist'
+      state.saveWAF(true)
+      db.setState('rule_categories', state.RULE_CATEGORIES)
+      phase = 'render'
+      const source = caddyfile === null ? (previous || '') : caddyfile
+      const content = render ? assets.withAssetGeneration(() => caddySvc.renderCaddyfile(source, state.WAF), id) : source
+      assets.syncGeneration(id)
+      configLock.atomicWriteFileSync(candidate, content, { mode: 0o640 })
+      phase = 'caddy-validate'
+      const validation = module.exports.validateCaddyfile(candidate)
+      if (!validation.ok) throw new Error(validation.error)
+      if (completeDatabaseRestore && db.getState('database_restore_pending') && validation.skipped) throw new Error('Finishing a database restore requires a local Caddy/Coraza binary to validate the restored configuration.')
+      wasRunning = reload && caddySvc.isAdminReachable()
+      const journal = { version: 1, id, caddyfile: file, previous, wasRunning }
+      phase = 'journal'
+      configLock.atomicWriteFileSync(journalPath(), JSON.stringify(journal), { mode: 0o600 })
+      syncDirectory(path.dirname(journalPath()))
+      journalWritten = true
+      phase = 'publish'
+      configLock.atomicWriteFileSync(file, content, { mode: 0o640 })
+      published = true
+      syncDirectory(path.dirname(file))
+      phase = 'reload'
+      let loaded = { reloaded: false, error: null }
+      if (reload) {
+        reloadAttempted = true
+        loaded = caddySvc.reloadCaddy()
+        if (!loaded.reloaded && wasRunning) throw new Error(loaded.error || 'Caddy reload failed')
       }
-    }
-  }
-
-  auditSvc.audit(req, label, '', {
-    reloaded,
-    engine: state.WAF.engine,
-    paranoia_level: state.WAF.paranoia_level,
-    ...(mutateResult && typeof mutateResult === 'object' ? { detail: mutateResult } : {}),
-  })
-
-    return {
-      ok: true,
-      reloaded,
-      reloadError,
-      backup,
-      validationSkipped: validation.skipped || null,
-      result: mutateResult,
+      phase = 'commit'
+      db.setState('config_tx_commit', id)
+      if (completeDatabaseRestore) db.setState('database_restore_pending', null)
+      conn.exec('COMMIT')
+      transaction = false
+      // Failure to remove the journal after commit is recoverable: the
+      // committed marker prevents a later startup undoing this success.
+      let cleanupWarning = null
+      try { removeJournal(); journalWritten = false } catch (error) { cleanupWarning = error.message }
+      try { auditSvc.audit(req, label, '', { reloaded: !!loaded.reloaded, engine: state.WAF.engine, paranoia_level: state.WAF.paranoia_level }) } catch {}
+      return { ok: true, reloaded: !!loaded.reloaded, reloadError: loaded.error || null, backup, result, validationSkipped: validation.skipped || null, cleanupWarning }
+    } catch (error) {
+      const rollbackErrors = []
+      if (transaction) {
+        try {
+          // SQLITE_FULL and some I/O failures automatically abort SQLite's
+          // transaction. Consult autocommit state before issuing ROLLBACK;
+          // an already completed rollback is not a recovery failure.
+          if (conn.isTransaction) conn.exec('ROLLBACK')
+          transaction = false
+        } catch (e) { rollbackErrors.push('database: ' + e.message) }
+      }
+      try { state.reloadAllFromDb() } catch (e) { rollbackErrors.push('state cache: ' + e.message) }
+      if (published) {
+        try { restoreFile({ previous }) } catch (e) { rollbackErrors.push('Caddyfile: ' + e.message) }
+      }
+      if (reloadAttempted && wasRunning) {
+        try {
+          const restored = caddySvc.reloadCaddy()
+          if (!restored.reloaded) throw new Error(restored.error || 'reload failed')
+        } catch (e) { rollbackErrors.push('Caddy reload: ' + e.message) }
+      }
+      if (!rollbackErrors.length) {
+        try { assets.discardGeneration(id) } catch (e) { rollbackErrors.push('candidate assets: ' + e.message) }
+      }
+      if (journalWritten && !rollbackErrors.length) {
+        try { removeJournal() } catch (e) { rollbackErrors.push('recovery journal: ' + e.message) }
+      }
+      try { auditSvc.audit(req, label + '.rollback', '', { reason: error.message, rollbackErrors }) } catch {}
+      return { ok: false, phase, error: error.message, rolledBack: rollbackErrors.length === 0, rollbackErrors, recoveryRequired: rollbackErrors.length > 0, backup }
+    } finally {
+      try { fs.unlinkSync(candidate) } catch {}
+      if (!transaction) conn.exec('PRAGMA synchronous = ' + Number(synchronous))
     }
   })
 }
 
-module.exports = {
-  apply,
-  backupCaddyfile,
-  validateCaddyfile,
-  snapshotWaf,
-  restoreWaf,
-  backupDir,
-}
+module.exports = { apply, recover, assertReady, backupCaddyfile, validateCaddyfile, snapshotWaf, restoreWaf, backupDir, journalPath }

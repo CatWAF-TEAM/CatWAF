@@ -6,7 +6,7 @@
 
 **A web application firewall for your website — powered by Coraza WAF + Caddy + the OWASP Core Rule Set.**
 
-Built on a native Go WAF engine. Not a ModSecurity wrapper.
+Node.js application and control plane, using the upstream Caddy/Coraza WAF engine and OWASP CRS.
 
 [![License: PolyForm Internal Use 1.0.0](https://img.shields.io/badge/license-PolyForm%20Internal%20Use%201.0.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-22%2B-brightgreen)](https://nodejs.org)
@@ -20,6 +20,12 @@ Built on a native Go WAF engine. Not a ModSecurity wrapper.
 
 CatWAF sits in front of your website and inspects every request through Coraza — a native Go WAF engine running the OWASP Core Rule Set — then gives you a control panel for it. Turn protection on, tune how strict it is, block bad IPs and countries, and see what's actually hitting your site.
 
+**Security patchset status:** the CatWAF application remains Node.js, with no added
+Go source or custom proxy runtime patches. Release validation is still blocked by
+reload connection resets, audit-record loss during overlapping requests and log
+rotations, and one unsuppressed dependency-module advisory. See the
+[current security recheck](docs/security-recheck-2026-10-17.md) for measured results.
+
 ### What stops the bad guys
 
 - **Coraza WAF + OWASP CRS** at the edge, tuned from a dashboard instead of SecRule files
@@ -27,7 +33,7 @@ CatWAF sits in front of your website and inspects every request through Coraza �
 - **Edge ban enforcement** — banned addresses are dropped by Caddy itself, no hop to CatWAF
 - **Kernel-level drops (opt-in)** — mirror bans into nftables so they die at SYN
 - **Challenge gate + tool fingerprinting + DNSBL/community lists/ASN/rDNS** — layered reputation before payloads are evaluated
-- **Under-attack mode** — one switch that challenges every visitor and shortens verdict caching
+- **Under-attack mode** — one switch that challenges every visitor, with a fresh verdict for each request
 - **Alerts that actually fire** — spikes, new bans and engine changes delivered to Slack/Discord/Telegram/webhooks
 
 **CatWAF Free is the website-owner edition:** one site, one admin, no fleet management or SOC tooling. Everything here is meant to be usable without being a security engineer.
@@ -65,7 +71,7 @@ Switching later is one command and preserves everything — see
 Download the installer, read it, then run it:
 
 ```bash
-curl -fsSLo setup.sh https://raw.githubusercontent.com/agugusgeyehe-dot/catwaf/main/setup.sh
+curl -fsSLo setup.sh https://raw.githubusercontent.com/CatWAF-TEAM/CatWAF/release-1.0.1/setup.sh
 less setup.sh
 sudo bash setup.sh            # interactive: choose Lite or Full
 ```
@@ -106,7 +112,7 @@ Caddy requests HTTPS certificates for both automatically. Lite needs neither rec
 ### On your own machine
 
 ```bash
-git clone https://github.com/agugusgeyehe-dot/catwaf
+git clone https://github.com/CatWAF-TEAM/CatWAF.git catwaf
 cd catwaf
 
 # Lite — WAF + CLI, no frontend dependencies at all
@@ -270,13 +276,13 @@ Control panels regenerate their own vhosts, so a file written underneath them wo
 
 **Access control** — IP allow/block lists with expiry, country-level geo blocking, method allowlists, basic auth, client certificates, and a switch to refuse any request whose `Host` isn't one of yours — the mechanical fix for [origin exposure](docs/protection.md#why-a-feature-might-not-be-doing-anything).
 
-**Enforcement tiers** — Stopping a client happens at whichever layer is cheapest: a canary list (touching `/.env` or `/.git` is intent, and earns an instant escalating ban), the Caddyfile itself (banned addresses rendered as an `abort` matcher — no hop, no evaluation), optionally an nftables set for drops at SYN, and finally the challenge gate. An UNDER-ATTACK MODE switch challenges every visitor and shortens cached verdicts when the bad hours arrive.
+**Enforcement tiers** — Stopping a client happens at whichever layer is cheapest: a canary list (touching `/.env` or `/.git` is intent, and earns an instant escalating ban), the Caddyfile itself (banned addresses rendered as an `abort` matcher — no hop, no evaluation), optionally an nftables set for drops at SYN, and finally the challenge gate. An UNDER-ATTACK MODE switch challenges every visitor. Final verdicts are recomputed for each request.
 
 **Client reputation** — The rule engine asks *is this request malicious?*; this layer asks *should this client be here at all?* A challenge gate (cookie, JavaScript proof-of-work, a self-hosted captcha, or reCAPTCHA/hCaptcha/Turnstile/mCaptcha), behavioural banning, ASN and forward-confirmed reverse-DNS rules, DNSBLs and subscribed community blocklists. Every feature that stops an address writes to [one ban store](docs/protection.md#active-bans), so "why is this visitor blocked" has a single answer. All of it is off by default. See [the protection guide](docs/protection.md).
 
 **Configuration** — Around 326 settings across 46 groups — TLS and certificates, reverse-proxy behaviour, response headers, CORS, compression, caching, generated `robots.txt` and `security.txt` — reachable from the dashboard, `catwaf settings`, or the API, all through the same validation. Every change can be [previewed as a Caddyfile diff](docs/cli.md#catwaf-settings) before it applies, and is validated by Caddy and rolled back if it wouldn't load. See the [settings reference](docs/settings.md).
 
-**Operations** — One scheduler for every timed task, backups (optionally AES-256-CBC encrypted at rest) with a real restore path, configuration templates, CSV and printable reports, a [Prometheus endpoint](docs/metrics.md), a JSONL event stream for your SIEM, `catwaf update` against GitHub releases, and two-factor admin login. `catwaf doctor` reports what the installed Caddy build can actually do, and names anything you've switched on that couldn't be rendered because of a missing module — so an enabled feature is never a silent no-op.
+**Operations** — One scheduler for every timed task, backups (optionally AES-256-GCM encrypted at rest) with a real restore path, configuration templates, CSV and printable reports, a [Prometheus endpoint](docs/metrics.md), a JSONL event stream for your SIEM, `catwaf update` against GitHub releases, and two-factor admin login. `catwaf doctor` reports what the installed Caddy build can actually do, and names anything you've switched on that couldn't be rendered because of a missing module — so an enabled feature is never a silent no-op.
 
 **Sensitive files** — Five graduated levels (SFL 0–4) that block access to config files, backups, and version-control directories, plus a scanner that walks your real webroot and shows what's publicly reachable.
 
@@ -300,7 +306,7 @@ Control panels regenerate their own vhosts, so a file written underneath them wo
 "unblock Vietnam"                 → asks you to confirm first
 ```
 
-Runs entirely on your machine via [Ollama](https://ollama.com) — nothing about your traffic or configuration leaves the box. Changes that *strengthen* protection apply immediately and can be undone in one click; anything that would *weaken* protection always asks first. Actions that could lock you out or turn protection off aren't available to it at all. See [the CatAI guide](docs/catai.md) for how it works and how to turn it on.
+By default, CatAI connects to [Ollama](https://ollama.com) on `127.0.0.1`; its prompts can include your questions, configuration and selected log data. Set `OLLAMA_URL` to another host only if you trust that endpoint and its network path. Model responses are untrusted prose, while requested changes pass through a fixed action catalog and server-side validation. Changes classified as strengthening protection apply immediately with Undo; weakening changes require confirmation. CatAI cannot turn the engine off or switch it to detection-only. See [the CatAI guide](docs/catai.md) for setup, limits and testing.
 
 > Everything above reports on your actual system. When something isn't configured yet, CatWAF says so plainly instead of showing sample data.
 
@@ -468,8 +474,8 @@ Two things nothing above covers, on any platform: the systemd units are installe
 an init system is present, and **reboot persistence has not been verified**. Both need a real
 VM. See [`docs/installation.md`](docs/installation.md).
 
-**Footprint.** The backend needs roughly 200 MB of RAM. CatAI adds about 1.4 GB while a
-question is being answered. On disk, the bundled GeoIP database is about 150 MB and is the
+**Footprint.** The backend needs roughly 200 MB of RAM. CatAI's additional memory depends
+on the chosen Ollama model, quantization and context; measure it on your target host. On disk, the bundled GeoIP database is about 150 MB and is the
 largest single component of a Lite install — see
 [SECURITY.md](SECURITY.md#geoip-data) for its licensing terms. A Full install adds roughly
 500 MB of frontend build dependencies on top.

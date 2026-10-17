@@ -133,7 +133,7 @@ router.post('/api/apps/discover', authRequired, writeRequired, async (req, res) 
 
 // The exact routes a protect run would create, with no file written, no
 // reload and no port assignment persisted.
-router.post('/api/apps/preview', authRequired, async (req, res) => {
+router.post('/api/apps/preview', authRequired, writeRequired, async (req, res) => {
   try {
     const result = await serialise('a configuration preview', () => protectSvc.protect({
       state, db, dryRun: true,

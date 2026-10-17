@@ -36,7 +36,9 @@ The order matters, and it is not arbitrary:
    DNSBL, the local threat feed and the shared threat network are queried
    together. A source that times out is recorded as *unavailable* and does not
    count as either a hit or a miss.
-4. **Scoring and the verdict**, cached briefly per address.
+4. **Scoring and the verdict**, recomputed for each request. Individual
+   intelligence sources cache their own results; request-dependent decisions
+   are not shared between URLs or visitors' credentials.
 
 Two properties are worth knowing because they shape everything else:
 
@@ -45,16 +47,23 @@ a non-2xx as "deny", so a bug or a hiccup in this layer would otherwise take
 the protected site down. A protection layer that can black-hole your site when
 it breaks is worse than one that occasionally lets a bad request through.
 
-**A slow source cannot slow the site.** The whole gather step runs under a
-single deadline. Anything that has not answered by then is ignored for that
-request.
+**Signal latency is bounded.** The gather step has a 2.5-second deadline.
+Anything that has not answered by then is ignored for that request. A slow
+source can still add up to that deadline to the request's latency.
 
 **Failing open has a limit you should know about.** "Fails open" covers every
 error CatWAF can *answer* — a lookup that throws, a source that times out, a
 malformed verdict. It cannot cover CatWAF not answering at all. If the CatWAF
 API process is stopped or unreachable while the hop is rendered, Caddy's dial
 fails, `forward_auth` reads that as a denial, and the protected site returns
-502 to every visitor.
+502 on connection failure, or 504 on a response timeout. The transport allows
+one second to connect and five seconds to receive response headers; reads have
+a six-second deadline and writes a five-second deadline. The header deadline
+fires before the read deadline to avoid an automatic retry on a stale pooled
+connection doubling the wait.
+A stalled API therefore fails within a bounded wait instead of leaving
+connections open indefinitely. These failures do not bypass enabled challenges
+or bans. The bounds apply to the enforcement hop, not the origin's own response.
 
 This is why **every runtime feature ships disabled**, including
 `tools_fingerprint`, which used to be on by default. A default install renders
@@ -254,9 +263,8 @@ CatWAF touches only its own table and replaces it atomically each refresh.
 ### Under-attack mode
 
 Settings → Anti-DDoS → UNDER-ATTACK MODE is the single switch for the bad
-hours: every visitor gets the JavaScript challenge regardless of trigger,
-and cached verdicts drop from 20s to ~2s so turning it off takes effect
-almost immediately. Slowloris-resistant connection timeouts live under
+hours: every visitor gets the JavaScript challenge regardless of trigger.
+Final verdicts are recomputed for each request. Slowloris-resistant connection timeouts live under
 Connections (read/write/idle) and are enforced by Caddy before any route
 runs.
 

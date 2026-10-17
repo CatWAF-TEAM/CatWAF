@@ -153,9 +153,7 @@ function requestReload(byJob) {
     reloadTimer = null
     try {
       const caddySvc = require('./caddy')
-      const state = require('./state')
-      caddySvc.patchWAFCaddyfile(state.WAF)
-      const r = caddySvc.reloadCaddy()
+      const r = caddySvc.applyToCaddy('jobs.reload', null)
       log.info('Reloaded after scheduled jobs', { jobs, reloaded: r.reloaded, error: r.error || null })
     } catch (e) {
       log.error('Reload after scheduled jobs failed', { jobs, error: e.message })

@@ -127,7 +127,7 @@ function patchCaddyfile(state) {
     content = content.slice(0, lastBrace) + '\n' + newBlock + '\n' + content.slice(lastBrace)
   }
 
-  configLock.atomicWriteFileSync(caddy.CADDYFILE_PATH, content, { mode: 0o644 })
+  configLock.atomicWriteFileSync(caddy.CADDYFILE_PATH, content, { mode: 0o640 })
   })
 }
 

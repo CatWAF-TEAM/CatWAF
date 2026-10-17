@@ -1,6 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  *, ::before, ::after { border-color: var(--color-gray-200, currentColor); }
+  button, [role="button"] { cursor: pointer; }
+}
 
 :root, [data-theme="black"] {
   --cat-bg:      #000000;
@@ -101,7 +105,9 @@
   .spin { animation: spin 2.4s linear infinite !important; }
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+}
 html { height: 100%; font-size: calc(16px * var(--cat-font-scale, 1)); }
 body {
   height: 100%;

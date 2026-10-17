@@ -173,7 +173,7 @@ router.get('/api/config/render-report', authRequired, (req, res) => {
   let rendered = null
   let error = null
   try {
-    rendered = caddySvc.renderCaddyfile(caddySvc.readCaddyfile(), state.WAF)
+    rendered = require('../services/render/util').withoutAssetWrites(() => caddySvc.renderCaddyfile(caddySvc.readCaddyfile(), state.WAF))
   } catch (e) {
     error = e.message
   }

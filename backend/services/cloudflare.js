@@ -5,6 +5,8 @@ const CF_STORE = { token: null, zone_id: null, record_id: null }
 async function cfFetch(path, token, opts = {}) {
   const res = await fetch(`${CF_BASE}${path}`, {
     ...opts,
+    redirect: 'error',
+    signal: opts.signal || AbortSignal.timeout(15000),
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',

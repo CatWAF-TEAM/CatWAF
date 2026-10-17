@@ -1,0 +1,511 @@
+{
+  "date": "2026-10-17",
+  "baseCommit": "de0b84a3730c5e53a21ffd4cbc044f407fffb0b7",
+  "branch": "security/full-audit-2026-10-16",
+  "environment": {
+    "native": "Kali Linux on WSL2; Node 24.19.0; npm 11.19.0; Go 1.26.9; Chromium 156",
+    "containers": "Isolated Docker daemon and Compose projects; original ten-container user stack untouched"
+  },
+  "syntax": {
+    "checked": 208,
+    "failures": []
+  },
+  "parsedYaml": [
+    "openapi.yaml",
+    "docker-compose.yml",
+    ".github/workflows/security.yml",
+    "test/fixtures/apache-php-fpm/docker-compose.yml",
+    "test/fixtures/nginx-php-fpm/docker-compose.yml"
+  ],
+  "openapi": {
+    "paths": 161,
+    "operations": 191,
+    "warnings": 0,
+    "liveResponseSamples": 56
+  },
+  "suiteCounts": {
+    "passed": 30,
+    "failed": 0,
+    "fullySkipped": 0,
+    "reportedAssertions": 1831
+  },
+  "suites": [
+    {
+      "file": "apps-api.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 11388,
+      "summaries": [
+        "37 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 37,
+      "outcome": "passed"
+    },
+    {
+      "file": "attack.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 13143,
+      "summaries": [
+        "142 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 142,
+      "outcome": "passed"
+    },
+    {
+      "file": "audit-log.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 3666,
+      "summaries": [
+        "37 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 37,
+      "outcome": "passed"
+    },
+    {
+      "file": "audit-rotation.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2485,
+      "summaries": [
+        "61 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 61,
+      "outcome": "passed"
+    },
+    {
+      "file": "auth-flow.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 46842,
+      "summaries": [
+        "27 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 27,
+      "outcome": "passed"
+    },
+    {
+      "file": "catai.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1877,
+      "summaries": [
+        "66 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 66,
+      "outcome": "passed"
+    },
+    {
+      "file": "concurrency.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 600,
+      "summaries": [
+        "16 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 16,
+      "outcome": "passed"
+    },
+    {
+      "file": "discovery.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1875,
+      "summaries": [
+        "291 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 291,
+      "outcome": "passed"
+    },
+    {
+      "file": "edge-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 619,
+      "summaries": [
+        "13 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 13,
+      "outcome": "passed"
+    },
+    {
+      "file": "edition.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 900,
+      "summaries": [
+        "166 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 166,
+      "outcome": "passed"
+    },
+    {
+      "file": "extensions.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 4383,
+      "summaries": [
+        "35 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 35,
+      "outcome": "passed"
+    },
+    {
+      "file": "features.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1879,
+      "summaries": [
+        "32 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 32,
+      "outcome": "passed"
+    },
+    {
+      "file": "frontend-smoke.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 62468,
+      "summaries": [
+        "44 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 44,
+      "outcome": "passed"
+    },
+    {
+      "file": "image-policy.test.js",
+      "exit": 0,
+      "signal": null,
+      "summaries": [
+        "ℹ tests 6",
+        "ℹ pass 6",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 6,
+      "outcome": "passed"
+    },
+    {
+      "file": "openapi-drift.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1768,
+      "summaries": [
+        "73 passed, 0 failed, 0 warnings"
+      ],
+      "failures": [],
+      "passed": 73,
+      "outcome": "passed"
+    },
+    {
+      "file": "platform.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2503,
+      "summaries": [
+        "110 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 110,
+      "outcome": "passed"
+    },
+    {
+      "file": "protect-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1151,
+      "summaries": [
+        "33 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 33,
+      "outcome": "passed"
+    },
+    {
+      "file": "protection-units.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 164,
+      "summaries": [
+        "167 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 167,
+      "outcome": "passed"
+    },
+    {
+      "file": "qr.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 141,
+      "summaries": [
+        "39 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 39,
+      "outcome": "passed"
+    },
+    {
+      "file": "render.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 566,
+      "summaries": [
+        "12 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 12,
+      "outcome": "passed"
+    },
+    {
+      "file": "restore-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1333,
+      "summaries": [
+        "ℹ tests 1",
+        "ℹ pass 1",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 1,
+      "outcome": "passed"
+    },
+    {
+      "file": "security-audit.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 4738,
+      "summaries": [
+        "ℹ tests 25",
+        "ℹ pass 25",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 25,
+      "outcome": "passed"
+    },
+    {
+      "file": "security-recovery.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1674,
+      "summaries": [
+        "ℹ tests 16",
+        "ℹ pass 16",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 16,
+      "outcome": "passed"
+    },
+    {
+      "file": "security.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 4380,
+      "summaries": [
+        "52 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 52,
+      "outcome": "passed"
+    },
+    {
+      "file": "sfl-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2487,
+      "summaries": [
+        "39 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 39,
+      "outcome": "passed"
+    },
+    {
+      "file": "subdomain.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 610,
+      "summaries": [
+        "39 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 39,
+      "outcome": "passed"
+    },
+    {
+      "file": "trust-proxy.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 5632,
+      "summaries": [
+        "4 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 4,
+      "outcome": "passed"
+    },
+    {
+      "file": "upload-scan.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 228,
+      "summaries": [
+        "44 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 44,
+      "outcome": "passed"
+    },
+    {
+      "file": "waf-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1232,
+      "summaries": [
+        "37 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 37,
+      "outcome": "passed"
+    },
+    {
+      "file": "waftools.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 10294,
+      "summaries": [
+        "167 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 167,
+      "outcome": "passed"
+    }
+  ],
+  "commands": {
+    "npmTest": "exit 0; complete configured suite chain",
+    "frontendBuild": "exit 0",
+    "browser": "frontend smoke and auth-flow both pass",
+    "containerIsolation": "pass; backend UID 1000, proxy UID 1001, private DB denied to proxy",
+    "containerHealth": "all three shipped containers healthy",
+    "containerRestore": "pass",
+    "liveRedisTls": "pass",
+    "discoveryFixtures": "both stacks pass; six non-root healthy containers, PHP executed, database socket authentication works and passwordless TCP refused"
+  },
+  "npmAudits": {
+    "backend": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "frontend": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  },
+  "configurationScan": {
+    "files": 8,
+    "passedChecks": 216,
+    "findings": []
+  },
+  "images": {
+    "backend": {
+      "imageId": "sha256:84c70f8c8d15d91a2ec33bc5af8bef6195bbd5695810b0eb65944c00a7b1e1e7",
+      "findings": [
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "type": "gobinary",
+          "severity": "UNKNOWN",
+          "fix": null
+        }
+      ]
+    },
+    "caddy": {
+      "imageId": "sha256:18dbdb2c3ae8791d1fc11222aa34849e17ffdd8bf4aa72636a2b9fb25823324a",
+      "findings": [
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "type": "gobinary",
+          "severity": "UNKNOWN",
+          "fix": null
+        }
+      ]
+    },
+    "test-app": {
+      "imageId": "sha256:9937fbb13fff42e49561e5d1101f23f9084bf6248419662d9cb498299d2cdbe8",
+      "findings": []
+    }
+  },
+  "fixtureImages": {
+    "booknook-apache": {
+      "imageId": "sha256:57419df30acb10d8cba7bd8c6a6fd8655110ce8db52d2174558e40a1b85c0818",
+      "findings": []
+    },
+    "booknook-php": {
+      "imageId": "sha256:573d272138ba37db940bfd2e98896008a113c6c46c63db00b2e310126d874aba",
+      "findings": []
+    },
+    "fake-web-php": {
+      "imageId": "sha256:506535a1c5aa600bd465d98363ae932e0c9263fe374194a764440e9406686af2",
+      "findings": []
+    },
+    "catwaf-fixture-nginx": {
+      "imageId": "sha256:c51a03002f87b3b1f48dc6d06bd4935769f03d5168bf9c9288a663bcb98f5673",
+      "findings": []
+    },
+    "catwaf-fixture-database": {
+      "imageId": "sha256:ff38287b6626d9d1076e742eb41d87bb86aa685112ec3e93a9a8b1dc5358e03e",
+      "findings": []
+    }
+  },
+  "goScan": {
+    "reachable": 0,
+    "importedPackages": 0,
+    "moduleOnly": [
+      "GO-2026-5932: affected OpenPGP packages absent"
+    ],
+    "latestCryptoVersionChecked": "v0.58.0",
+    "packagePolicy": {
+      "amd64": 1080,
+      "arm64": 1078,
+      "negativeImportRegression": "pass"
+    }
+  },
+  "limitations": [
+    "One unfixable OpenPGP module advisory remains in raw Caddy/backend scans; it affects no imported package in the tested build.",
+    "No proof of every payload combination, visual state, WAF evasion, power-loss or network-filesystem behavior.",
+    "Live paid/external integrations and production DNS/TLS require deployment-specific staging.",
+    "Generated asset generations are retained for rollback; operators must manage retention.",
+    "Database coordination requires updated cooperating processes; stop older releases and unrelated SQLite tools explicitly."
+  ],
+  "historicalEvidence": "The prior 2026-10-16 output directory and logs named before/old fixture versions are historical, not current results."
+}

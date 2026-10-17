@@ -1,12 +1,10 @@
 # docker/Caddyfile — baked into the Caddy image at build time.
 #
-# The admin API listens on 0.0.0.0:2019 so the backend container can reach
-# it to reload config. It is NOT published to the host in docker-compose.yml,
-# so it stays on the internal compose network only. This is what replaced
-# the old Docker-socket + `docker exec` reload mechanism.
+# The admin API uses a permissioned Unix socket mounted only into the
+# backend and Caddy containers. An origin compromise cannot reach it by TCP.
 
 {
-    admin 0.0.0.0:2019
+    admin unix//run/catwaf-admin/admin.sock|0660
     order coraza_waf first
 }
 
@@ -16,6 +14,12 @@
 # Not WAF-inspected: this is CatWAF's own authenticated surface, not an
 # origin it is proxying for.
 :8081 {
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' https: 'unsafe-inline'; img-src 'self' data:; font-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+    }
     handle /api/* {
         reverse_proxy backend:8000
     }
@@ -73,7 +77,7 @@
       SecRequestBodyLimit 13107200
       SecRule REQUEST_HEADERS:User-Agent "@rx (?i)sqlmap|nikto|nmap|masscan|zgrab|dirbuster|gobuster|wfuzz|hydra|burpsuite" "id:9050,phase:1,deny,status:403,log,msg:'CatWAF Blocked Scanner UA'"
       SecAuditEngine RelevantOnly
-      SecAuditLogParts ABCEFHZ
+      SecAuditLogParts AHZ
       SecAuditLogType Serial
       SecAuditLog /var/log/coraza/audit.json
       SecAuditLogFormat JSON

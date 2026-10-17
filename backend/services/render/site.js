@@ -84,6 +84,7 @@ function challengeRoutes(ctx, out) {
       `reverse_proxy ${q(ctx.backend)} {`,
       ...indent([
         'header_up X-CatWAF-Challenge 1',
+        `header_up X-CatWAF-Challenge-Key ${q(require('../secrets').derive('challenge-key'))}`,
         // The backend keys challenges, attempt counters and solved-token
         // bindings to the address these headers carry. Both are overwritten
         // here because a visitor can set either freely — trusting them
@@ -125,6 +126,19 @@ function enforcementGate(ctx, out) {
     `header_up X-Real-IP {http.request.remote.host}`,
     `header_up X-CatWAF-Client-IP {http.request.remote.host}`,
     `copy_headers ${q('X-CatWAF-Verdict')}`,
+    // Classification has a 2.5s signal deadline. Bound the transport too:
+    // a stopped or wedged API must not leave visitor requests waiting for
+    // Caddy's otherwise unbounded response-header timeout. Keep failures
+    // closed so an outage cannot silently bypass an enabled challenge/ban.
+    ...block('transport http', [
+      'dial_timeout 1s',
+      'response_header_timeout 5s',
+      // Let the response-header deadline fire first. Equal read/header
+      // deadlines can turn a reused-connection read timeout into a retry
+      // inside Go's HTTP transport, doubling the visitor's wait.
+      'read_timeout 6s',
+      'write_timeout 5s',
+    ]),
   ]
   // The challenge endpoints must not themselves be gated, or a challenged
   // visitor could never reach the page that would clear the challenge.
@@ -546,7 +560,9 @@ function tls(ctx, out) {
       return
     }
     const cert = writeAsset('certs/site-cert.pem', t.custom_cert_pem, { mode: 0o640 })
-    const key = writeAsset('certs/site-key.pem', t.custom_key_pem, { mode: 0o600 })
+    // Caddy runs separately and reads generated files through the restricted
+    // shared group. The database itself remains owner-only.
+    const key = writeAsset('certs/site-key.pem', t.custom_key_pem, { mode: 0o640 })
     args = ` ${q(cert)} ${q(key)}`
   } else if (t.acme_email) {
     args = ` ${q(t.acme_email)}`

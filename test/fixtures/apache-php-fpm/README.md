@@ -8,7 +8,7 @@ its own stack rather than by relabelling the nginx one.
 |---|---|---|
 | `booknook_apache` | `booknook-apache` (built here, from `httpd:2.4-alpine`) | `80`, **not published** |
 | `booknook_php` | `booknook-php` (built here, from `php:8.3-fpm-alpine`) | `9000`, not published |
-| `booknook_db` | `mariadb:10.11` | `3306`, not published |
+| `booknook_db` | `catwaf-fixture-database` (patched Alpine MariaDB) | `3306`, not published |
 
 **Nothing is published to the host.** CatWAF must discover Apache on the
 Docker network and reach it without any host port mapping — and because
@@ -87,3 +87,10 @@ without a relabel gives the container `Permission denied` on the webroot.
 ```bash
 docker compose -p booknook -f test/fixtures/apache-php-fpm/docker-compose.yml down -v
 ```
+
+The fixture Dockerfiles apply distribution security updates and run without root.
+The shared Database.Dockerfile creates only Unix-socket administrative accounts;
+there is no embedded root password or remote database user. The sample pages do
+not use the database: its purpose is to prove discovery rejects non-HTTP services.
+Run `bash scripts/check-discovery-fixtures.sh` from the repository to build and
+check both stacks; it refuses existing fixture containers and cleans up its own.

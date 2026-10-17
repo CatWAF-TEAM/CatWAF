@@ -13,22 +13,29 @@
 # non-Docker equivalent of this same step.
 
 # ── Stage 1: build the frontend ──────────────────────────────────────────
-FROM node:22-slim AS frontend-build
+FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+RUN npm ci
 COPY frontend ./
 RUN npm run build
 # Output: /app/frontend/dist
 
 # ── Stage 2: build Caddy with the Coraza module ──────────────────────────
-# caddy:builder is the official image for exactly this — it has Go and
-# xcaddy preinstalled, so this stage is just "run the one command from
-FROM caddy:2-builder AS caddy-build
-RUN xcaddy build --with github.com/corazawaf/coraza-caddy/v2
+FROM caddy:2.11.7-builder@sha256:d842facfd63b960922e57444ff76fd8f0793a66dfdcf481af8026e1f4e6a39b4 AS caddy-build
+WORKDIR /build
+ENV GOTOOLCHAIN=go1.26.9 CGO_ENABLED=0
+# Retain symbols so vulnerability scanners can inspect package reachability.
+ENV XCADDY_GO_BUILD_FLAGS="-trimpath -tags=nobadger,nomysql,nopgx"
+# Original upstream xcaddy integration, with security version pins only.
+RUN xcaddy build v2.11.7 --output /usr/bin/caddy \
+    --with github.com/corazawaf/coraza-caddy/v2@v2.6.2 \
+    --with golang.org/x/net/http2@v0.61.0 \
+    --with golang.org/x/crypto/cryptobyte@v0.58.0
 
 # ── Stage 3: final runtime image ─────────────────────────────────────────
-FROM caddy:2-alpine
+FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+RUN apk upgrade --no-cache
 COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
 COPY --from=frontend-build /app/frontend/dist /srv/dashboard
 COPY docker/Caddyfile /etc/caddy/Caddyfile
@@ -37,9 +44,22 @@ COPY docker/Caddyfile /etc/caddy/Caddyfile
 # directly (separate from the WAF directives block CatWAF's backend writes
 # into the Caddyfile itself).
 RUN mkdir -p /etc/coraza/lists
+RUN mkdir -p /run/catwaf-admin /var/log/coraza \
+    && touch /var/log/coraza/audit.json \
+    && chgrp -R 1000 /run/catwaf-admin /etc/caddy /var/log/coraza \
+    && chmod 2770 /run/catwaf-admin /etc/caddy /var/log/coraza \
+    && chmod 0660 /etc/caddy/Caddyfile /var/log/coraza/audit.json
 
 EXPOSE 80 443 8081
 
 # Confirm the module actually made it into the binary at build time, not
 # you to run by hand.
 RUN caddy list-modules | grep -q http.handlers.waf
+
+# Keep the proxy distinct from backend UID 1000: sharing that UID would let
+# it read the backend's 0600 SQLite file through the read-only asset mount.
+RUN mkdir -p /data/caddy /config/caddy \
+    && chown -R 1001:1000 /data /config
+USER 1001:1000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8081/ || exit 1

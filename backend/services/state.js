@@ -139,21 +139,24 @@ const state = {
   // Returns { result, sync } where sync mirrors applyToCaddy's
   // { reloaded, error } shape (sync === null when syncCaddy was not set).
   updateWAF(mutator, { label = 'waf.update', req = null, syncCaddy = false } = {}) {
+    if (syncCaddy) {
+      const tx = require('./configTx').apply({ label, req, mutate: s => mutator(s.WAF) })
+      if (!tx.ok) throw Object.assign(new Error('Configuration update failed: ' + tx.error), { configurationTransaction: tx })
+      return { result: tx.result, sync: { reloaded: tx.reloaded, error: tx.reloadError } }
+    }
     const configLock = require('./configLock')
     return configLock.withConfigLock(() => {
+      require('./configTx').assertReady()
       const rev = currentRev()
       if (_loadedRev === null || _loadedRev !== rev) {
         replaceInMemory(loadWAF())
         _loadedRev = rev
       }
-      const result = mutator(state.WAF)
+      let result
+      try { result = mutator(state.WAF) }
+      catch (error) { replaceInMemory(loadWAF()); throw error }
       persistWAFLocked()
-      let sync = null
-      if (syncCaddy) {
-        const caddy = require('./caddy')
-        sync = caddy.applyToCaddy(label, req)
-      }
-      return { result, sync }
+      return { result, sync: null }
     })
   },
   saveRuleCategories() { db.setState('rule_categories', state.RULE_CATEGORIES) },

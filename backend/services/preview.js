@@ -1,19 +1,17 @@
 // preview.js — see the configuration change before committing it (idea #50).
 //
-// CatWAF already had the *safety* half of this: configTx snapshots,
-// validates and rolls back atomically, so a bad change cannot survive. What
-// it did not have was the *preview* half — every edit applied the instant it
-// was saved, with undo available only afterwards through a snapshot restore.
-//
-// The transaction pipeline already does all the hard parts, so this is a new
-// entry point rather than new logic: run mutate + render, stop before
-// `caddy validate` and the reload, diff the two rendered Caddyfiles, then put
-// the in-memory state back exactly as it was.
+// Run mutate + render without publishing settings or generated files. Diff
+// the two configurations, roll back the SQLite savepoint and restore caches.
+// Full configuration apply has separate rollback behavior in configTx; it
+// is not an atomic commit across SQLite, generated assets and Caddy.
 
 const state = require('./state')
 const caddySvc = require('./caddy')
 const configTx = require('./configTx')
 const settings = require('./settings')
+const configLock = require('./configLock')
+const db = require('./db')
+const { withoutAssetWrites } = require('./render/util')
 
 const MAX_DIFF_LINES = 4000
 
@@ -82,6 +80,21 @@ function summarize(lines) {
 // in a finally so a throwing mutation cannot leave the process holding
 // half-applied settings.
 function preview({ mutate, label = 'preview' } = {}) {
+  return configLock.withConfigLock(() => withoutAssetWrites(() => {
+    // Other processes must never observe temporary preview settings. The
+    // savepoint also rolls back writes made by the normal settings setters.
+    const conn = db.getDb()
+    conn.exec('SAVEPOINT catwaf_preview')
+    try { return previewLocked({ mutate, label }) }
+    finally {
+      conn.exec('ROLLBACK TO catwaf_preview; RELEASE catwaf_preview')
+      state.reloadAllFromDb()
+      settings.reload()
+    }
+  }))
+}
+
+function previewLocked({ mutate, label }) {
   let beforeText
   try {
     beforeText = caddySvc.readCaddyfile()

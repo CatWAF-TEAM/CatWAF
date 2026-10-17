@@ -30,7 +30,7 @@
                           ^
                           |
         backend reloads Caddy over the
-        admin API (:2019) -- no Docker socket
+        admin API (permissioned Unix socket) -- no Docker socket
 ```
 
 ```mermaid
@@ -45,7 +45,7 @@ graph LR
 
     AL -.ingested every 5s.-> BE
     BE --> DB[("SQLite")]
-    BE -->|writes SecRules,<br/>reload via admin API :2019| C
+    BE -->|writes SecRules,<br/>reload via admin Unix socket| C
 ```
 
 **Nothing in this diagram uses the Docker socket.** The backend reloads Caddy
@@ -71,6 +71,11 @@ endpoints: its leftmost entry is attacker-chosen.
 Everything else keeps going straight from Caddy to your origin.
 
 What the backend does: serves the dashboard's API, persists WAF configuration, translates that configuration into real Coraza directives written into your Caddyfile, triggers a reload, and ingests Coraza's own audit log so the dashboard can show real traffic.
+
+The current reliability review found request resets during upstream reloads and
+audit-record loss when a slow request outlives multiple log rotations. Reload
+acknowledgement does not prove older requests or audit writers have finished.
+Both remain failing release regressions; see [the current recheck](security-recheck-2026-10-17.md).
 
 ## Backend layout
 

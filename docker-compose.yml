@@ -3,7 +3,7 @@
 #
 # Ports:
 #   :80 / :443  public traffic for the protected website, inspected by Coraza
-#   :8081       CatWAF admin dashboard (control panel UI + API)
+#   :8081       CatWAF admin dashboard, loopback-only
 #   :8082       the protected website's own origin, loopback-only (see test-app)
 #
 # Quick start:
@@ -14,9 +14,8 @@
 #   curl "http://localhost/?id=1+UNION+SELECT+1,2,3--"         (blocked)
 #
 # NO DOCKER SOCKET. The backend reloads Caddy over Caddy's own admin API
-# (see CADDY_ADMIN_URL below and backend/services/caddy.js). The admin API
-# is reachable only on the internal compose network — it is deliberately
-# NOT published to the host.
+# over a permissioned Unix socket shared only with the backend. The origin
+# container cannot reach the configuration API over the compose network.
 
 services:
   backend:
@@ -28,8 +27,10 @@ services:
     env_file:
       - .env
     environment:
+      HOST: 0.0.0.0
+      CATWAF_INTERNAL_HOST: backend
       CADDYFILE_PATH: /etc/caddy/Caddyfile
-      CADDY_ADMIN_URL: http://caddy:2019
+      CADDY_ADMIN_SOCKET: /run/catwaf-admin/admin.sock
       CORAZA_AUDIT_LOG: /var/log/coraza/audit.json
     ports:
       # Loopback only. The dashboard reaches the API through Caddy on :80
@@ -43,6 +44,7 @@ services:
       - catwaf-data:/app/data
       - caddy-config:/etc/caddy
       - coraza-logs:/var/log/coraza
+      - caddy-admin:/run/catwaf-admin:ro
     depends_on:
       - caddy
     security_opt:
@@ -76,12 +78,19 @@ services:
       # CatWAF's own admin dashboard (control panel UI + its /api and /g
       # routes, proxied to backend:8000). Separate from the protected site so
       # the two can never collide on one port.
-      - "8081:8081"
-    # Port 2019 (admin API) is intentionally NOT in `ports` — it stays on
-    # the internal network, reachable by the backend service only.
+      - "127.0.0.1:8081:8081"
+    # The admin API has no TCP listener; its socket volume is backend-only.
     volumes:
       - caddy-config:/etc/caddy
+      # Certificate keys, ACME accounts and Caddy's saved runtime config must
+      # survive `compose down` followed by `up`, not just container restarts.
+      - caddy-data:/data
+      - caddy-runtime-config:/config
       - coraza-logs:/var/log/coraza
+      - caddy-admin:/run/catwaf-admin
+      - catwaf-data:/app/data:ro
+    group_add:
+      - "1000"
     depends_on:
       - test-app
     security_opt:
@@ -124,8 +133,16 @@ services:
       - "127.0.0.1:8082:8080"
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
 
 volumes:
   catwaf-data:
   caddy-config:
+  caddy-data:
+  caddy-runtime-config:
   coraza-logs:
+  caddy-admin:

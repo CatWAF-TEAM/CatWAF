@@ -47,24 +47,33 @@ function isGroup(group) {
   return typeof group === 'string' && Object.hasOwn(SCHEMA, group)
 }
 
-// Bumped by every write path. Failure here must never break the write itself —
-// a missed bump costs freshness, not correctness, and the writer's own cache
-// is updated directly anyway.
-function bumpRev() {
+// A settings write and its revision must commit together. Otherwise another
+// process may indefinitely keep a stale (potentially less restrictive) policy.
+function persist(group, value) {
+  const conn = db.getDb()
+  conn.exec('SAVEPOINT catwaf_settings')
   try {
-    const next = (Number(db.getState(REV_KEY)) || 0) + 1
-    db.setState(REV_KEY, next)
-    seenRev = next
+    const revision = (Number(db.getStateStrict(REV_KEY)) || 0) + 1
+    db.setState(storageKey(group), value)
+    db.setState(REV_KEY, revision)
+    conn.exec('RELEASE catwaf_settings')
+    cache.set(group, value)
+    seenRev = revision
     lastRevCheck = Date.now()
-  } catch {}
+  } catch (error) {
+    try {
+      if (conn.isTransaction) conn.exec('ROLLBACK TO catwaf_settings; RELEASE catwaf_settings')
+    } finally { reloadAllFromDb() }
+    throw error
+  }
 }
 
 function syncRev() {
   const now = Date.now()
   if (now - lastRevCheck < REV_CHECK_MS) return
+  // Do not serve cached policy after a failed read or postpone the next read.
+  const rev = db.getStateStrict(REV_KEY)
   lastRevCheck = now
-  let rev = null
-  try { rev = db.getState(REV_KEY) } catch { return }
   if (rev !== seenRev) {
     seenRev = rev
     cache.clear()
@@ -75,7 +84,8 @@ function get(group) {
   if (!isGroup(group)) throw new Error(`Unknown settings group "${group}"`)
   syncRev()
   if (cache.has(group)) return cache.get(group)
-  const stored = db.getState(storageKey(group))
+  const stored = db.getStateStrict(storageKey(group))
+  if (stored !== null && (typeof stored !== 'object' || Array.isArray(stored))) throw new Error(`Invalid stored settings group "${group}"`)
   const value = { ...defaultsFor(group), ...(stored && typeof stored === 'object' && !Array.isArray(stored) ? stripUnsafeKeys(stored) : {}) }
   cache.set(group, value)
   return value
@@ -99,6 +109,10 @@ function redact(group, value = get(group)) {
       out[`${name}_set`] = !!(value[name] && String(value[name]).length)
     } else {
       out[name] = value[name]
+      // Legacy Redis URLs could embed credentials in a non-writeOnly field.
+      if (group === 'cluster' && name === 'url' && out[name]) {
+        try { const url = new URL(out[name]); url.username = ''; url.password = ''; out[name] = url.toString() } catch { out[name] = '' }
+      }
     }
   }
   return out
@@ -147,9 +161,7 @@ function set(group, patch, { merge = true } = {}) {
   return configLock.withConfigLock(() => {
     const v = validate(group, patch, { merge })
     if (!v.ok) return v
-    db.setState(storageKey(group), v.value)
-    cache.set(group, v.value)
-    bumpRev()
+    persist(group, v.value)
     return { ok: true, value: v.value, redacted: redact(group, v.value) }
   })
 }
@@ -160,9 +172,7 @@ function replace(group, value) {
   if (!isGroup(group)) return
   configLock.withConfigLock(() => {
     const merged = { ...defaultsFor(group), ...(value && typeof value === 'object' ? stripUnsafeKeys(value) : {}) }
-    db.setState(storageKey(group), merged)
-    cache.set(group, merged)
-    bumpRev()
+    persist(group, merged)
   })
 }
 
@@ -170,9 +180,7 @@ function reset(group) {
   if (!isGroup(group)) return { ok: false, error: `Unknown settings group "${group}"` }
   return configLock.withConfigLock(() => {
     const value = defaultsFor(group)
-    db.setState(storageKey(group), value)
-    cache.set(group, value)
-    bumpRev()
+    persist(group, value)
     return { ok: true, value, redacted: redact(group, value) }
   })
 }

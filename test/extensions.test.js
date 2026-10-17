@@ -2,6 +2,7 @@ const os = require('os'), fs = require('fs'), path = require('path')
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'catwaf-boot-'))
 process.env.DB_DIR = DIR
 process.env.JWT_SECRET = 'a'.repeat(64)
+process.env.CATWAF_SETUP_TOKEN = 'bootstrap-test-token-'.repeat(3)
 process.env.CADDYFILE_PATH = path.join(DIR, 'Caddyfile')
 process.env.CORAZA_AUDIT_LOG = path.join(DIR, 'logs', 'audit.json')
 
@@ -24,7 +25,7 @@ const check = (n, c, x) => c ? (pass++, console.log('  ok   ' + n)) : (fail++, c
 const server = app.listen(0, '127.0.0.1', async () => {
   const base = `http://127.0.0.1:${server.address().port}`
   async function raw(m, p, o = {}) {
-    const opts = { method: m, headers: { 'Content-Type': 'application/json', ...(o.headers||{}) } }
+    const opts = { method: m, headers: { 'Content-Type': 'application/json', ...(p.startsWith('/api/setup/') ? { 'X-CatWAF-Setup-Token': process.env.CATWAF_SETUP_TOKEN } : {}), ...(o.headers||{}) } }
     if (o.body !== undefined) opts.body = typeof o.body === 'string' ? o.body : JSON.stringify(o.body)
     const res = await fetch(base + p, opts)
     const text = await res.text()
@@ -146,6 +147,7 @@ const server = app.listen(0, '127.0.0.1', async () => {
 
   console.log(`\n${pass} passed, ${fail} failed\n`)
   server.close(); jobs.stop()
-  fs.rmSync(DIR, { recursive: true, force: true })
+  // Windows keeps SQLite handles open until exit; cleanup must not mask failures.
+  try { fs.rmSync(DIR, { recursive: true, force: true }) } catch {}
   process.exit(fail ? 1 : 0)
 })

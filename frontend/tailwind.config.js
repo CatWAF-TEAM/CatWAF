@@ -1,7 +1,4 @@
-const themeColor = (name, fallback) => ({ opacityValue }) =>
-  opacityValue === undefined
-    ? `var(${name}, ${fallback})`
-    : `color-mix(in srgb, var(${name}, ${fallback}) calc(${opacityValue} * 100%), transparent)`
+const themeColor = (name, fallback) => `var(${name}, ${fallback})`
 
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],

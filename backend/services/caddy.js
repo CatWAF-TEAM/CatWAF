@@ -74,6 +74,7 @@ const CADDYFILE_PATH  = detectCaddyfilePath()
 const CADDYFILE_SOURCE = process.env.CADDYFILE_PATH ? 'CADDYFILE_PATH' : 'auto-detected'
 const CORAZA_LIST_DIR = process.env.CORAZA_LIST_DIR || '/etc/coraza/lists'
 const CADDY_ADMIN_URL = (process.env.CADDY_ADMIN_URL || 'http://127.0.0.1:2019').replace(/\/+$/, '')
+const CADDY_ADMIN_SOCKET = process.env.CADDY_ADMIN_SOCKET || ''
 // Coraza opens SecAuditLog when the config is PROVISIONED, not lazily on the
 // first audit entry — so `caddy validate` fails outright if the path is not
 // openable. /var/log/coraza is the right default under Docker (compose mounts
@@ -202,9 +203,10 @@ function ensureAuditLog() {
   const candidates = rotated ? [rotated, ...auditLogCandidates()] : auditLogCandidates()
   for (const candidate of candidates) {
     try {
-      fs.mkdirSync(path.dirname(candidate), { recursive: true })
+      fs.mkdirSync(path.dirname(candidate), { recursive: true, mode: 0o750 })
       // `a` creates the file if missing and never truncates an existing log.
-      fs.closeSync(fs.openSync(candidate, 'a'))
+      fs.closeSync(fs.openSync(candidate, 'a', 0o660))
+      if ((fs.statSync(candidate).mode & 0o777) !== 0o660) fs.chmodSync(candidate, 0o660)
       if (!isWritable(candidate)) throw new Error('not writable')
 
       const fellBack = candidate !== (process.env.CORAZA_AUDIT_LOG || DEFAULT_AUDIT_LOG) && candidate !== rotated
@@ -238,13 +240,32 @@ process.stdin.on('end', async () => {
   const opts = {
     method,
     signal: AbortSignal.timeout(Number(process.env.CW_ADMIN_TIMEOUT)),
-    headers: { 'Origin': process.env.CW_ADMIN_URL },
+    // Unix sockets are protected by filesystem permissions. Caddy has no
+    // TCP origins for a Unix listener and rejects a synthetic TCP Origin.
+    // Keep the origin header for configured TCP listeners that require it.
+    headers: process.env.CW_ADMIN_SOCKET ? {} : { 'Origin': process.env.CW_ADMIN_URL },
   }
   if (method !== 'GET') {
     opts.headers['Content-Type'] = process.env.CW_ADMIN_CTYPE
     opts.body = body
   }
   try {
+    if (process.env.CW_ADMIN_SOCKET) {
+      const request = require('http').request({
+        socketPath: process.env.CW_ADMIN_SOCKET,
+        path: process.env.CW_ADMIN_PATH,
+        method,
+        headers: opts.headers,
+        signal: opts.signal,
+      }, res => {
+        res.on('data', chunk => process.stdout.write(chunk))
+        res.on('end', () => process.exit(res.statusCode >= 200 && res.statusCode < 300 ? 0 : 1))
+        res.on('error', error => { process.stderr.write(error.message); process.exit(1) })
+      })
+      request.on('error', error => { process.stderr.write(error.message); process.exit(1) })
+      request.end(method === 'GET' ? undefined : body)
+      return
+    }
     const res = await fetch(url, opts)
     const text = await res.text()
     process.stdout.write(text)
@@ -264,6 +285,7 @@ function adminApiRequest(method, apiPath, body = '', contentType = 'application/
     env: {
       ...process.env,
       CW_ADMIN_URL: CADDY_ADMIN_URL,
+      CW_ADMIN_SOCKET: CADDY_ADMIN_SOCKET,
       CW_ADMIN_PATH: apiPath,
       CW_ADMIN_METHOD: method,
       CW_ADMIN_CTYPE: contentType,
@@ -390,8 +412,11 @@ function buildCorazaSnippet(waf) {
   }
 
   if (waf.allowed_content_types && waf.allowed_content_types.length > 0) {
-    const contentTypes = waf.allowed_content_types.map(t => escapeForDirective(String(t))).join('|')
-    lines.push(`      SecAction "id:900006,phase:1,pass,t:none,nolog,setvar:'tx.allowed_request_content_type=${contentTypes}.replace(/\\|/,\' \')'"`)
+    // CRS 920420 searches for a pipe-delimited MIME token, not a substring.
+    // Render the value here; a literal JavaScript .replace expression in a
+    // SecLang action is never evaluated and corrupts the last MIME entry.
+    const contentTypes = waf.allowed_content_types.map(t => `|${escapeForDirective(String(t))}|`).join(' ')
+    lines.push(`      SecAction "id:900006,phase:1,pass,t:none,nolog,setvar:'tx.allowed_request_content_type=${contentTypes}'"`)
   }
 
   const sampling = num(waf.sampling_percentage, 100, { min: 0, max: 100 })
@@ -424,7 +449,10 @@ function buildCorazaSnippet(waf) {
   }
 
   lines.push(`      SecAuditEngine ${waf.audit_log ? 'RelevantOnly' : 'Off'}`)
-  lines.push('      SecAuditLogParts ABCEFHZ')
+  // Header/body sections contain cookies, credentials and application data.
+  // Keep transaction metadata and rule messages; matched fragments remain
+  // sensitive and the audit log still requires restricted access.
+  lines.push('      SecAuditLogParts AHZ')
   lines.push('      SecAuditLogType Serial')
   lines.push(`      SecAuditLog ${AUDIT_LOG_PATH}`)
   lines.push('      SecAuditLogFormat JSON')
@@ -703,10 +731,13 @@ function mergeRenderReport(report) {
   }
 }
 
-// Pure: takes the current Caddyfile text and returns what CatWAF would write,
-// without touching the filesystem. The diff preview (idea #50) and every
-// dry-run path go through this, so what is previewed is what is applied.
+// Render into a fresh immutable asset generation. Preview callers wrap this
+// in withoutAssetWrites(), which returns virtual paths without writing.
 function renderCaddyfile(content, waf) {
+  return require('./render/util').withAssetGeneration(() => renderCaddyfileGeneration(content, waf))
+}
+
+function renderCaddyfileGeneration(content, waf) {
   LAST_RENDER = { skipped: [], notes: [], at: new Date().toISOString() }
   RENDER_SOURCE = content
   let newBlock
@@ -740,7 +771,7 @@ function patchWAFCaddyfile(waf) {
   const content = renderCaddyfile(readCaddyfile(), waf)
 
   try {
-    configLock.atomicWriteFileSync(CADDYFILE_PATH, content, { mode: 0o644 })
+    configLock.atomicWriteFileSync(CADDYFILE_PATH, content, { mode: 0o640 })
   } catch (e) {
     if (e.code === 'EACCES' || e.code === 'EPERM') {
       throw new Error(
@@ -757,16 +788,8 @@ function patchWAFCaddyfile(waf) {
 
 
 function applyToCaddy(label, req) {
-  let caddyResult = { reloaded: false, error: 'skipped' }
-  try {
-    patchWAFCaddyfile(state.WAF)
-    caddyResult = reloadCaddy()
-    auditSvc.audit(req, label, '', { reloaded: caddyResult.reloaded, engine: state.WAF.engine, pl: state.WAF.paranoia_level })
-  } catch (e) {
-    caddyResult = { reloaded: false, error: e.message }
-    auditSvc.audit(req, label + '.error', e.message)
-  }
-  return caddyResult
+  const tx = require('./configTx').apply({ label, req, mutate: () => {} })
+  return { ...tx, reloaded: !!tx.reloaded, error: tx.ok ? tx.reloadError : tx.error }
 }
 
 function readCaddyfile() {
@@ -780,6 +803,7 @@ function firstLine(msg) {
 
 // host:port for `caddy reload --address`, derived from CADDY_ADMIN_URL.
 function adminApiAddress() {
+  if (CADDY_ADMIN_SOCKET) return `unix/${CADDY_ADMIN_SOCKET}`
   try {
     const u = new URL(CADDY_ADMIN_URL)
     return u.port ? `${u.hostname}:${u.port}` : u.hostname
@@ -836,6 +860,10 @@ function isCaddyRunning() {
   try { adminApiRequest('GET', '/config/', '', 'application/json', 3000); return true } catch {}
   try { execFileSync('pgrep', ['-x', 'caddy'], { timeout: 3000 }); return true } catch {}
   return caddyPidsFromProc().length > 0
+}
+
+function isAdminReachable() {
+  try { adminApiRequest('GET', '/config/', '', 'application/json', 3000); return true } catch { return false }
 }
 
 function getCaddyModules() {
@@ -914,7 +942,7 @@ function queueCaddyReload() {
 }
 
 module.exports = {
-  CADDYFILE_PATH, CADDYFILE_SOURCE, CORAZA_LIST_DIR, CADDY_ADMIN_URL, AUDIT_LOG_PATH,
+  CADDYFILE_PATH, CADDYFILE_SOURCE, CORAZA_LIST_DIR, CADDY_ADMIN_URL, CADDY_ADMIN_SOCKET, AUDIT_LOG_PATH,
   DEFAULT_AUDIT_LOG, ensureAuditLog, auditLogStatus, auditLogCandidates,
   baseAuditLogPath, rotatedActivePath, resolveAuditLogPath,
   WAF_MARKER_START, WAF_MARKER_END,
@@ -924,7 +952,7 @@ module.exports = {
   topLevelBlocks, enclosingSiteBlock, upstreamsIn, currentSiteContext,
   renderCaddyfile, lastRenderReport, denyAction, corazaMatcherLines,
   buildWAFBlock, buildCorazaSnippet, patchWAFCaddyfile, readCaddyfile, reloadCaddy,
-  isCaddyRunning, getCaddyModules, getCaddyPid,
+  isCaddyRunning, isAdminReachable, getCaddyModules, getCaddyPid,
   applyToCaddy, queueCaddyReload, redactCaddyfile,
   isReloadPending: () => reloadQueuePending,
 }

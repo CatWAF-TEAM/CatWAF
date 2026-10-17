@@ -4,6 +4,11 @@ CatWAF is a security product, so this document describes what it actually protec
 it does not, and how it handles the sensitive material you give it. It avoids claims that
 cannot be backed up.
 
+Security validation and release reliability are separate gates. See the current
+[reliability baseline](docs/reliability-baseline.md) and
+[2026-10-17 recheck](docs/security-recheck-2026-10-17.md) for current results,
+the reload connection-reset blocker and the unsuppressed dependency advisory.
+
 ## What CatWAF protects, and what it does not
 
 CatWAF inspects HTTP requests to your site through Coraza running the OWASP Core Rule Set,
@@ -22,8 +27,11 @@ reproduction. Do not open a public issue for an unpatched vulnerability.
 
 ## Secrets
 
-**Where secrets live.** All secrets are in `.env` in the installation directory. Nothing
-sensitive is stored in the SQLite database except password hashes (bcrypt, cost 12).
+**Where secrets live.** Deployment secrets live in `.env`. SQLite also contains password
+hashes, session state, encrypted TOTP seeds, recovery-code hashes and integration settings.
+Some integration tokens are stored as plaintext settings. Protect the database, its WAL
+sidecars, generated Caddyfiles and backups as credentials. Redacted API reads do not mean
+the stored data is encrypted.
 
 | Secret | Purpose | Created by |
 |---|---|---|
@@ -35,17 +43,24 @@ sensitive is stored in the SQLite database except password hashes (bcrypt, cost 
 installer writes it under `umask 077`, so it is never briefly world-readable between
 creation and `chmod`. CatWAF warns at startup if `.env` is group- or world-readable.
 
-**What is never logged.** The request logger records method, path, status and duration
-only. Request bodies, cookies and `Authorization` headers are never captured, so they
-cannot appear in the database or in log files. Query parameters are redacted in
-`catwaf explain` output. The Cloudflare token travels in a request body and is therefore
-never logged.
+**Logs.** The API request logger omits request bodies and credential headers. Generated
+Coraza configuration now uses `SecAuditLogParts AHZ`, excluding full request/response
+headers and bodies. Transaction URIs and rule messages can still contain sensitive
+values or matched fragments; restrict log access and retention. Earlier logs may contain
+headers and bodies. Re-render existing configuration to adopt the new default; existing
+log files are not automatically scrubbed.
 
 **Admin passwords.** Setup reads the password from the `CATWAF_ADMIN_PASSWORD`
 environment variable rather than a flag, because a flag would be visible in your shell
 history and in `ps` output for the lifetime of the process. There are no default
 accounts — until you create one, there is nothing to log into. Minimum length is 8
-characters. Changing a password invalidates every existing session for that account.
+characters and new passwords must fit within bcrypt's 72-byte UTF-8 limit. Changing a
+password invalidates every existing session for that account.
+
+**First account.** Prefer the local CLI. Web bootstrap requires `CATWAF_SETUP_TOKEN`
+containing at least 32 bytes and a matching `X-CatWAF-Setup-Token` header on every setup
+request. Without it, setup returns 404. Creating the first account closes the bootstrap
+surface under the configuration lock. Remove the token after setup.
 
 ## Network exposure
 
@@ -55,10 +70,11 @@ Binding the dashboard to every interface (`HOST=0.0.0.0` in `.env`) is how you r
 which terminates TLS and proxies to it. Do not bind it to `0.0.0.0` unless something else
 is restricting access to it.
 
-**Caddy's admin API (port 2019)** is how CatWAF reloads configuration in containers. In
-`docker-compose.yml` it stays on the internal network and is deliberately **not**
-published to the host. Exposing it is equivalent to handing over control of your reverse
-proxy.
+**Caddy's admin API** controls the reverse proxy. Compose uses a Unix socket at
+`/run/catwaf-admin/admin.sock`, mode 0660, shared only with the backend. It has no TCP
+listener. The dashboard's HTTP port 8081 is published on loopback only. Native installs
+may use a local admin endpoint or set `CADDY_ADMIN_SOCKET`; never expose it to an origin
+container or untrusted network.
 
 **No Docker socket.** CatWAF does not mount or use `/var/run/docker.sock`. Socket access
 is effectively root on the host — the wrong trade for a security product. Caddy is
@@ -78,8 +94,15 @@ Requests to `/api/*` must satisfy all of the following:
    reset loses access immediately rather than at token expiry. Tokens are accepted in the
    `Authorization` header only — never in a query string.
 3. **A request signature.** HMAC over method, path, timestamp, nonce and body hash, with a
-   2-minute clock-skew window and nonce replay rejection.
-4. **A role.** Every state-changing endpoint requires the `admin` role.
+   2-minute clock-skew window. Nonces are stored atomically in SQLite, so replay rejection
+   survives restarts and works across workers sharing that database.
+4. **A durable session.** Missing, revoked, expired, idle, mismatched or unreadable session
+   state rejects access. A successful login creates the session before returning its JWT.
+5. **A role.** Administrative mutations require `admin`. Logout acts on the caller's
+   own session; viewer chat requests cannot apply CatAI actions.
+
+Public health/auth-status, login, token-gated setup, metrics and Caddy's keyed gateway
+endpoints have their own controls. See [the route inventory](docs/security-api-inventory.csv).
 
 Rate limits apply to both gated and ungated paths. Login attempts are limited per
 IP-and-username **and** per account, so a client that controls its `X-Forwarded-For`
@@ -87,8 +110,8 @@ header (direct exposure without a reverse proxy) still faces a cumulative budget
 targeted username.
 
 A note on trust boundaries: the enforcement and upload-scan hops derive the visitor's
-address from `X-Real-IP` / `X-CatWAF-Client-IP`, which the generated Caddyfile always
-overwrites with the real connection address before anything reaches the backend. If you
+address from `X-Real-IP` / `X-CatWAF-Client-IP` only with a valid derived gateway key.
+The generated Caddyfile overwrites these headers before anything reaches the backend. If you
 put your own proxy in front of CatWAF's API port, it must do the same — do not forward
 client-supplied versions of those headers untouched.
 
@@ -118,11 +141,16 @@ no releases yet the check reports that instead of an error.
 
 ## Backup encryption
 
-With `backups.encrypt` enabled, manifests and database copies are written as
-AES-256-CBC (PBKDF2, 200k iterations) via the system `openssl`. The passphrase
-comes from `CATWAF_BACKUP_PASSPHRASE` in `.env` and is deliberately NOT stored
-in the database — a backup decryptable by whatever it protects would not be a
-backup. Lose the passphrase and the backups are gone; that is the deal.
+With `backups.encrypt` enabled, new manifests and database copies use AES-256-GCM,
+PBKDF2-HMAC-SHA256 (310,000 iterations), a random salt and nonce, and an authenticated
+`CWBACK02` header. Wrong keys or modified ciphertext fail authentication. The passphrase
+comes from `CATWAF_BACKUP_PASSPHRASE`, outside the database. Keep it separately recoverable.
+
+Legacy OpenSSL CBC backups remain readable for migration and have no authenticity
+guarantee; only restore legacy files from a trusted source, then create a new encrypted
+backup. A redacted manifest does not redact its optional full database sibling. Database
+copies use a consistent SQLite snapshot and mode 0600. Stop all CatWAF processes before
+database restore; the WAL-age warning is not proof that every database handle is closed.
 
 ## Concurrent configuration writers
 
@@ -206,10 +234,10 @@ existing unit is disabled and removed rather than left to fail on every boot.
 ## Docker
 
 - No Docker socket is mounted.
-- Caddy's admin API is not published to the host.
+- Caddy's admin API is a permissioned Unix socket with no TCP listener.
 - Containers run with `no-new-privileges:true`.
-- The test app in `docker-compose.yml` is intentionally vulnerable and has no `ports:`
-  entry — it is reachable only through Caddy and Coraza. Do not expose it.
+- The test app is intentionally vulnerable. Its direct origin port is published only
+  on `127.0.0.1:8082`; direct access bypasses Coraza. Never expose that port publicly.
 - `catwaf docker` validates subcommands against an allowlist and builds its argument
   vector from constants. It runs `docker compose`, which requires access to the Docker
   daemon; anyone who can run it can already control containers on that host.
@@ -223,30 +251,32 @@ each release.
 
 ## Dependency posture
 
-Advisories with a non-breaking fix are taken. Two in 1.0.2:
+The 2026-10-17 update refreshes both npm lockfiles, React Router and Tailwind.
+CatWAF application code remains Node.js. Local Go source, module manifests,
+runtime overlays and listener patches were removed at the maintainer's request.
+The original upstream Caddy/Coraza dependency integration remains, with pinned
+versions and no CatWAF modifications to either dependency. Container bases are
+pinned by digest, with distribution security updates applied during the build.
+Backend and demo runtime images omit npm/yarn; rebuild them for updates.
 
-- **`js-yaml` quadratic CPU consumption in `!!omap` resolution** (GHSA-5p4m-2wfm-xmqj) —
-  upgraded to 4.3.1. It was not reachable with hostile input: the only `yaml.load()` call
-  is in `services/catai/retrieval.js`, parsing the frontmatter of the knowledge-base files
-  shipped inside the repository. Patched anyway, because the fix cost nothing.
-- **`nanoid`** (transitive, via the frontend build toolchain) — upgraded to 3.3.18.
+The current scans report zero npm/OS advisories and an OpenPGP module finding.
+The current upstream binary retains symbols; its binary scan reports zero
+reachable or imported-package vulnerabilities and one required-module advisory.
+The image gate still blocks every reported advisory, including this unfixed
+finding. See [the assessment](docs/go-advisory-assessment.md) and the raw recheck
+evidence. Neither package-level evidence nor zero npm findings is an all-clear.
 
-After those, `npm audit` reports advisories in two remaining transitive dependencies.
-Both were assessed for reachability rather than upgraded blindly, because in both cases
-the available "fix" is worse than the finding:
+All fixed API operations are now documented and schema-validated; method drift and
+inspection failures fail CI. Shipped containers and discovery fixtures run without
+root, have health checks, and pass the saved configuration and live isolation checks.
 
-- **`geoip-lite` → `rimraf`/`glob`/`minimatch`/`brace-expansion`, and `ip-address`.**
-  These are reached only from `geoip-lite`'s `scripts/updatedb.js`, the database updater.
-  CatWAF calls `geoip.lookup()` from `lib/geoip.js` and never invokes the updater. The
-  advised fix (`npm audit fix --force`) downgrades `geoip-lite` to 1.2.2, which is older
-  and not an improvement.
-- **`react-router` open redirect and `deserializeErrors` constructor injection.**
-  The dashboard is a pure client-side SPA with no server-side rendering or hydration, so
-  `deserializeErrors` is never called. Every `navigate()` and `<Link to>` target in the
-  codebase is a hardcoded constant, so there is no user-controlled navigation to redirect.
-  No fixed 6.x release exists — the project is already on 6.30.4, the latest of that line —
-  and the only remediation is a major upgrade to React Router 7, which is not appropriate
-  in a patch release.
+The Node.js installer checks existing/downloaded Caddy binaries against the
+compiler/module security baseline and validates a candidate before replacing
+an installed executable. The upstream download uses
+HTTPS, size/deadline limits, optional CATWAF_CADDY_SHA256 and local TOFU pinning.
+TOFU is not an upstream signature. An existing hash pin can require an explicit
+CATWAF_CADDY_ALLOW_NEW_BUILD=1 after the operator verifies an intended upgrade.
 
-Both are re-checked each release, and were re-checked for 1.0.2. If either becomes
-reachable, it will be fixed rather than re-documented.
+The Linux security workflow runs backend/WAF/browser tests, npm scans,
+container isolation and image scans. See [the measured audit](docs/security-audit-2026-10-16.md)
+and [restore procedure](docs/security-recovery.md) for evidence and limitations.

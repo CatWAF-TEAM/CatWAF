@@ -4,9 +4,9 @@
 # recognize: nginx and PHP-FPM in SEPARATE containers on a shared Docker
 # network, plus a database container that is not a web service at all.
 #
-#     freshmart_nginx  nginx:1.25-alpine   container 80,   NOT published
+#     freshmart_nginx  nginx stable       container 80,   NOT published
 #     freshmart_php    (built here)        container 9000, not published
-#     freshmart_db     mariadb:10.11       container 3306, not published
+#     freshmart_db     Alpine MariaDB     container 3306, not published
 #
 # NOTHING here is published to the host. That is the point: CatWAF must
 # discover the nginx service on the Docker network and route to it as
@@ -30,7 +30,10 @@
 
 services:
   nginx:
-    image: nginx:1.25-alpine
+    build:
+      context: .
+      dockerfile: Nginx.Dockerfile
+    image: catwaf-fixture-nginx
     container_name: freshmart_nginx
     restart: unless-stopped
     # Deliberately NOT published to the host. This fixture exists to verify
@@ -68,14 +71,14 @@ services:
       - no-new-privileges:true
 
   db:
-    image: mariadb:10.11
+    build:
+      context: ..
+      dockerfile: Database.Dockerfile
+    image: catwaf-fixture-database
     container_name: freshmart_db
     restart: unless-stopped
     expose:
       - "3306"
-    environment:
-      MARIADB_ROOT_PASSWORD: fixture-only-not-a-real-secret
-      MARIADB_DATABASE: freshmart
     networks:
       - freshmart
     security_opt:

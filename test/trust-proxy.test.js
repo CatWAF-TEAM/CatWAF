@@ -22,6 +22,7 @@ function makeEnv(dir, port, extra) {
     PORT: String(port),
     CADDY_ADMIN_URL: 'http://127.0.0.1:19917',
     JWT_SECRET: 't'.repeat(64),
+    CATWAF_SETUP_TOKEN: 'bootstrap-test-token-'.repeat(3),
     CATAI_ENABLED: 'false',
     ...extra,
   }
@@ -72,7 +73,7 @@ async function probeIp(base) {
   // data directory, so the wizard is open.
   await fetch(`${base}/api/setup/account`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.7, 8.8.8.8' },
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.7, 8.8.8.8', 'X-CatWAF-Setup-Token': 'bootstrap-test-token-'.repeat(3) },
     body: JSON.stringify({ username: 'tp-probe', password: 'correct-horse-battery', confirm: 'correct-horse-battery' }),
     signal: AbortSignal.timeout(5000),
   }).catch(() => {})

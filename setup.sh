@@ -10,7 +10,7 @@
 #
 # Recommended use — download, read, then run:
 #
-#   curl -fsSLo setup.sh https://raw.githubusercontent.com/agugusgeyehe-dot/catwaf/main/setup.sh
+#   curl -fsSLo setup.sh https://raw.githubusercontent.com/CatWAF-TEAM/CatWAF/release-1.0.1/setup.sh
 #   less setup.sh
 #   sudo bash setup.sh --lite
 #
@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-readonly REPO_URL="https://github.com/agugusgeyehe-dot/catwaf"
+readonly REPO_URL="https://github.com/CatWAF-TEAM/CatWAF"
 readonly MIN_NODE_MAJOR=22
 readonly DEFAULT_DIR="/opt/catwaf"
 readonly SERVICE_USER="catwaf"
@@ -371,8 +371,8 @@ install_dependencies() {
   step "Installing dependencies (edition: $EDITION)"
   # postinstall reads CATWAF_EDITION and installs frontend dependencies only
   # for Full. This is what keeps a Lite install free of the React toolchain.
-  ( cd "$INSTALL_DIR" && CATWAF_EDITION="$EDITION" npm install --omit=dev --no-audit --no-fund ) \
-    || die "npm install failed."
+  ( cd "$INSTALL_DIR" && CATWAF_EDITION="$EDITION" npm ci --omit=dev --no-audit --no-fund ) \
+    || die "npm ci failed."
   ok "Dependencies installed"
 
   if [ "$EDITION" = "full" ]; then

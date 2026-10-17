@@ -1,0 +1,534 @@
+{
+  "date": "2026-10-17",
+  "releaseReady": false,
+  "parityWithBunkerWebEstablished": false,
+  "suiteCounts": {
+    "files": 32,
+    "passed": 31,
+    "failed": 1,
+    "reportedPassingChecks": 1846
+  },
+  "results": [
+    {
+      "file": "apps-api.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 10051,
+      "summaries": [
+        "37 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 37,
+      "failed": 0
+    },
+    {
+      "file": "attack.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 15262,
+      "summaries": [
+        "142 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 142,
+      "failed": 0
+    },
+    {
+      "file": "audit-log.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 5109,
+      "summaries": [
+        "37 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 37,
+      "failed": 0
+    },
+    {
+      "file": "audit-rotation.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 3267,
+      "summaries": [
+        "61 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 61,
+      "failed": 0
+    },
+    {
+      "file": "auth-flow.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 48611,
+      "summaries": [
+        "27 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 27,
+      "failed": 0,
+      "rerunReason": "Original browser run saw Google Fonts net::ERR_NETWORK_CHANGED while independent Docker fixtures changed networking. Rerun after Docker work completed; original log retained."
+    },
+    {
+      "file": "catai.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1744,
+      "summaries": [
+        "66 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 66,
+      "failed": 0
+    },
+    {
+      "file": "concurrency.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 813,
+      "summaries": [
+        "16 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 16,
+      "failed": 0
+    },
+    {
+      "file": "discovery.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2149,
+      "summaries": [
+        "291 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 291,
+      "failed": 0
+    },
+    {
+      "file": "edge-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 666,
+      "summaries": [
+        "13 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 13,
+      "failed": 0
+    },
+    {
+      "file": "edition.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1369,
+      "summaries": [
+        "166 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 166,
+      "failed": 0
+    },
+    {
+      "file": "extensions.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 5614,
+      "summaries": [
+        "35 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 35,
+      "failed": 0
+    },
+    {
+      "file": "features.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2356,
+      "summaries": [
+        "32 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 32,
+      "failed": 0
+    },
+    {
+      "file": "frontend-smoke.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 65233,
+      "summaries": [
+        "44 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 44,
+      "failed": 0
+    },
+    {
+      "file": "healthcheck.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 216,
+      "summaries": [
+        "ℹ tests 7",
+        "ℹ pass 7",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "file": "image-policy.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 74,
+      "summaries": [
+        "ℹ tests 6",
+        "ℹ pass 6",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 6,
+      "failed": 0
+    },
+    {
+      "file": "openapi-drift.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2711,
+      "summaries": [
+        "73 passed, 0 failed, 0 warnings"
+      ],
+      "failures": [],
+      "passed": 73,
+      "failed": 0
+    },
+    {
+      "file": "platform.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2958,
+      "summaries": [
+        "110 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 110,
+      "failed": 0
+    },
+    {
+      "file": "protect-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1471,
+      "summaries": [
+        "33 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 33,
+      "failed": 0
+    },
+    {
+      "file": "protection-units.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 276,
+      "summaries": [
+        "167 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 167,
+      "failed": 0
+    },
+    {
+      "file": "qr.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 200,
+      "summaries": [
+        "39 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 39,
+      "failed": 0
+    },
+    {
+      "file": "reliability-e2e.test.js",
+      "exit": 1,
+      "signal": null,
+      "durationMs": 7733,
+      "summaries": [
+        "ℹ tests 10",
+        "ℹ pass 8",
+        "ℹ fail 2",
+        "ℹ skipped 0"
+      ],
+      "failures": [
+        "  ✖ concurrent valid and invalid reloads never bypass or drop sampled requests (2628.849477ms)",
+        "✖ WAF availability through reloads and dependency failures (8746.989991ms)",
+        "✖ failing tests:",
+        "✖ concurrent valid and invalid reloads never bypass or drop sampled requests (2628.849477ms)"
+      ],
+      "passed": 8,
+      "failed": 2
+    },
+    {
+      "file": "render.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 728,
+      "summaries": [
+        "12 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 12,
+      "failed": 0
+    },
+    {
+      "file": "restore-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1809,
+      "summaries": [
+        "ℹ tests 1",
+        "ℹ pass 1",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 1,
+      "failed": 0
+    },
+    {
+      "file": "security-audit.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 6010,
+      "summaries": [
+        "ℹ tests 25",
+        "ℹ pass 25",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 25,
+      "failed": 0
+    },
+    {
+      "file": "security-recovery.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1850,
+      "summaries": [
+        "ℹ tests 16",
+        "ℹ pass 16",
+        "ℹ fail 0",
+        "ℹ skipped 0"
+      ],
+      "failures": [],
+      "passed": 16,
+      "failed": 0
+    },
+    {
+      "file": "security.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 5302,
+      "summaries": [
+        "52 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 52,
+      "failed": 0
+    },
+    {
+      "file": "sfl-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 2759,
+      "summaries": [
+        "39 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 39,
+      "failed": 0
+    },
+    {
+      "file": "subdomain.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 853,
+      "summaries": [
+        "39 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 39,
+      "failed": 0
+    },
+    {
+      "file": "trust-proxy.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 6087,
+      "summaries": [
+        "4 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 4,
+      "failed": 0
+    },
+    {
+      "file": "upload-scan.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 298,
+      "summaries": [
+        "44 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 44,
+      "failed": 0
+    },
+    {
+      "file": "waf-e2e.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 1072,
+      "summaries": [
+        "37 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 37,
+      "failed": 0
+    },
+    {
+      "file": "waftools.test.js",
+      "exit": 0,
+      "signal": null,
+      "durationMs": 12528,
+      "summaries": [
+        "167 passed, 0 failed"
+      ],
+      "failures": [],
+      "passed": 167,
+      "failed": 0
+    }
+  ],
+  "syntax": {
+    "checked": 212,
+    "failures": []
+  },
+  "yamlFiles": [
+    "openapi.yaml",
+    "docker-compose.yml",
+    ".github/workflows/security.yml",
+    "test/fixtures/apache-php-fpm/docker-compose.yml",
+    "test/fixtures/nginx-php-fpm/docker-compose.yml"
+  ],
+  "npmTest": "exit 1: strict reload reliability gate failed; prior configured suites completed",
+  "containerLifecycle": {
+    "project": "catwaf-reliability-3351dcdb7b8b",
+    "checks": [
+      "named TLS and runtime volumes",
+      "real Unix admin health",
+      "no pending recovery",
+      "allowed traffic and SQLi blocking",
+      "API outage independence",
+      "container recreation",
+      "identical TLS certificate after recreation",
+      "blocking after recreation"
+    ],
+    "passed": 8
+  },
+  "minimalCaddyReproduction": {
+    "coraza": false,
+    "catwafApi": false,
+    "reloads": 20,
+    "concurrency": 4,
+    "passed": 427,
+    "failed": 6,
+    "errors": [
+      "socket hang up",
+      "socket hang up",
+      "socket hang up",
+      "socket hang up",
+      "socket hang up",
+      "socket hang up"
+    ]
+  },
+  "containerIsolation": "passed",
+  "npmAudits": {
+    "backend": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "frontend": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  },
+  "imageFindings": {
+    "backend": {
+      "imageId": "sha256:43c5ba3df718c4bea0c477a61bb11374a43bd506746f3c3e8ce704954fe974ab",
+      "findings": [
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "severity": "UNKNOWN",
+          "fix": null
+        }
+      ]
+    },
+    "caddy": {
+      "imageId": "sha256:18dbdb2c3ae8791d1fc11222aa34849e17ffdd8bf4aa72636a2b9fb25823324a",
+      "findings": [
+        {
+          "id": "GO-2026-5932",
+          "package": "golang.org/x/crypto",
+          "severity": "UNKNOWN",
+          "fix": null
+        }
+      ]
+    },
+    "test-app": {
+      "imageId": "sha256:9937fbb13fff42e49561e5d1101f23f9084bf6248419662d9cb498299d2cdbe8",
+      "findings": []
+    }
+  },
+  "configurationScan": {
+    "files": 8,
+    "passed": 216,
+    "findings": []
+  },
+  "openapi": {
+    "checks": 73,
+    "warnings": 0,
+    "operations": 191,
+    "paths": 161
+  },
+  "goBinaryScan": {
+    "reachableVulnerabilities": 0,
+    "importedPackageVulnerabilities": 0,
+    "moduleOnly": [
+      "GO-2026-5932; unimported OpenPGP; no fixed version"
+    ]
+  },
+  "limitations": [
+    "Reload connection resets remain an explicit release blocker, reproduced without CatWAF middleware.",
+    "Short fault tests do not establish sustained-load reliability, production SLOs, protocol/platform coverage or BunkerWeb parity.",
+    "TLS persistence test uses the internal CA; external ACME renewal/failure testing remains outstanding.",
+    "Native Linux amd64/WSL2 and isolated Docker only. Existing user services were not changed."
+  ]
+}

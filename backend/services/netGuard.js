@@ -31,6 +31,10 @@ function v4InBlock(ip, network, bits) {
 
 function v6Groups(ip) {
   let addr = ip.split('%')[0]
+  addr = addr.replace(/(\d{1,3}(?:\.\d{1,3}){3})$/, v4 => {
+    const n = v4ToInt(v4)
+    return `${(n >>> 16).toString(16)}:${(n & 0xffff).toString(16)}`
+  })
   const [head, tail] = addr.includes('::') ? addr.split('::') : [addr, null]
   const headParts = head ? head.split(':').filter(Boolean) : []
   const tailParts = tail ? tail.split(':').filter(Boolean) : []
@@ -55,13 +59,18 @@ function v6InBlock(groups, prefixHex, bits) {
 }
 
 const V6_BLOCKED = [
+  ['::', 96],
   ['::', 128],
   ['::1', 128],
   ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48],
   ['100::', 64],
   ['2001:db8::', 32],
+  ['2001::', 32],
+  ['2002::', 16],
   ['fc00::', 7],
   ['fe80::', 10],
+  ['fec0::', 10],
   ['ff00::', 8],
 ]
 
@@ -99,8 +108,12 @@ function reasonNotPublic(ip) {
     if (why) return why
   }
 
-  const groups = v6Groups(embedded ? ip.replace(/(\d{1,3}(?:\.\d{1,3}){3})$/, '0:0') : ip)
+  const groups = v6Groups(ip)
   if (!groups) return `${ip} could not be parsed`
+  // Judge the numeric address, not just the compressed ::ffff spelling.
+  if (groups.slice(0, 5).every(g => g === 0) && groups[5] === 0xffff) {
+    return reasonNotPublic(`${groups[6] >>> 8}.${groups[6] & 255}.${groups[7] >>> 8}.${groups[7] & 255}`)
+  }
   for (const [prefix, bits] of V6_BLOCKED) {
     if (v6InBlock(groups, prefix, bits)) return `${ip} is in the reserved range ${prefix}/${bits}`
   }
@@ -184,7 +197,10 @@ function resolvePinned(hostname, { allowLoopback }) {
     })
   })
   promise.then(
-    addrs => pinnedCache.set(key, { addrs, at: Date.now() }),
+    addrs => {
+      if (pinnedCache.size >= 1000) pinnedCache.delete(pinnedCache.keys().next().value)
+      pinnedCache.set(key, { addrs, at: Date.now() })
+    },
     () => {},
   )
   return promise
@@ -286,7 +302,7 @@ function requestOnce(urlObj, { method, headers, body, timeoutMs, allowLoopback }
     }
 
     const req = (isTls ? https : http).request({
-      host: urlObj.hostname,
+      host: urlObj.hostname.replace(/^\[|\]$/g, ''),
       port: urlObj.port || (isTls ? 443 : 80),
       path: `${urlObj.pathname}${urlObj.search}`,
       method,
@@ -336,7 +352,8 @@ async function guardedFetch(rawUrl, { timeoutMs = 8000, method = 'GET', headers 
     // request returns only addresses this module has already judged, so the
     // socket cannot land anywhere else even if DNS changes between here and
     // connect().
-    await resolvePinned(url.hostname, { allowLoopback })
+    if (url.username || url.password) throw Object.assign(new Error('URL credentials are not supported.'), { status: 400 })
+    await resolvePinned(url.hostname.replace(/^\[|\]$/g, ''), { allowLoopback })
 
     const { res, bufferPromise } = await requestOnce(url, {
       method: sendMethod,
@@ -357,8 +374,20 @@ async function guardedFetch(rawUrl, { timeoutMs = 8000, method = 'GET', headers 
     // the abandoned read's rejection.
     bufferPromise.catch(() => {})
     res.destroy()
+    const previous = url
     try { url = new URL(location, url) } catch {
       throw Object.assign(new Error('Redirect target is not a valid URL.'), { status: 400 })
+    }
+
+    if (previous.protocol === 'https:' && url.protocol !== 'https:') {
+      throw Object.assign(new Error('Refusing an HTTPS downgrade redirect.'), { status: 400 })
+    }
+    if (url.origin !== previous.origin) {
+      const publicHeaders = new Set(['accept', 'accept-encoding', 'user-agent'])
+      if (allowLoopback || sendBody != null || Object.keys(sendHeaders).some(k => !publicHeaders.has(k.toLowerCase()))) {
+        throw Object.assign(new Error('Refusing to forward an integration request to another origin.'), { status: 400 })
+      }
+      sendHeaders = Object.fromEntries(Object.entries(sendHeaders).filter(([k]) => publicHeaders.has(k.toLowerCase())))
     }
 
     // 307/308 preserve the method and body; 301/302/303 degrade to a bodyless
@@ -369,7 +398,7 @@ async function guardedFetch(rawUrl, { timeoutMs = 8000, method = 'GET', headers 
       if (sendBody != null) {
         sendBody = null
         sendHeaders = Object.fromEntries(
-          Object.entries(sendHeaders).filter(([k]) => k.toLowerCase() !== 'content-type'),
+          Object.entries(sendHeaders).filter(([k]) => !['content-type', 'content-length', 'transfer-encoding'].includes(k.toLowerCase())),
         )
       }
     }

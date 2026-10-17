@@ -355,7 +355,7 @@ ${info.apiHost} {\n    reverse_proxy 127.0.0.1:${port}\n}\n`
 
 ${controlPanel}`
 
-  fs.writeFileSync(CADDYFILE_PATH, content, 'utf8')
+  require('../../backend/services/configLock').atomicWriteFileSync(CADDYFILE_PATH, content, { mode: 0o640 })
 }
 
 function buildFrontend() {

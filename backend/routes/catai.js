@@ -114,6 +114,7 @@ router.post('/api/catai/chat', chatLimiterPerDay, chatLimiterPerMin, async (req,
   if (typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ detail: 'message is required' })
   }
+  if (Buffer.byteLength(message, 'utf8') > 8192) return res.status(400).json({ detail: 'message exceeds 8192 UTF-8 bytes' })
   if (!ENABLED) return res.status(503).json({ detail: 'CatAI is disabled.', code: 'CATAI_DISABLED' })
 
   req.setTimeout(0)
