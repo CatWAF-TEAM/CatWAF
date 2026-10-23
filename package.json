@@ -3,7 +3,7 @@
   "version": "1.0.2",
   "description": "A web application firewall for your website — Coraza WAF + Caddy + the OWASP Core Rule Set, with a CLI and dashboard on top.",
   "private": true,
-  "license": "LicenseRef-PolyForm-Internal-Use-1.0.0",
+  "license": "MIT",
   "author": "Zachary Yanakiev (K.Z.)",
   "homepage": "https://github.com/CatWAF-TEAM/CatWAF#readme",
   "repository": {

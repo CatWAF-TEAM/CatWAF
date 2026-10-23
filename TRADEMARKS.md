@@ -4,8 +4,7 @@
 not licensed under the software license in [LICENSE](LICENSE), which covers
 only the source code.
 
-Forks or derivative works based on the source of this project (as it existed
-under its prior PolyForm Strict 1.0.0 license, or otherwise) may not use the "CatWAF" name or
+Forks or derivative works based on the source of this project may not use the "CatWAF" name or
 the cat logo to identify themselves, their distributions, or any related
 product or service, without separate written permission.
 

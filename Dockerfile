@@ -31,7 +31,7 @@ LABEL org.opencontainers.image.title="CatWAF" \
       org.opencontainers.image.description="Web application firewall built on Caddy + Coraza + OWASP CRS" \
       org.opencontainers.image.version="1.0.2" \
       org.opencontainers.image.source="https://github.com/agugusgeyehe-dot/catwaf" \
-      org.opencontainers.image.licenses="LicenseRef-PolyForm-Internal-Use-1.0.0"
+      org.opencontainers.image.licenses="MIT"
 
 # This image is the API server only. Caddy (with Coraza) and the built
 # dashboard live in docker/Caddy.Dockerfile, so:

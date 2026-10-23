@@ -9,6 +9,10 @@ public release. Those entries are preserved below under the release they belong 
 numbers themselves were retired, not the history. Nothing here has been deleted or
 rewritten, only re-filed.
 
+## Unreleased — 2026-10-24
+
+- CatWAF Free returns to the MIT License. Use, modification, redistribution, and commercial operation are permitted under `LICENSE`. CatWAF Pro remains separate; the CatWAF name and logo remain governed by `TRADEMARKS.md`.
+
 **1.0.2 security update — 2026-10-17.** This update hardens configuration and
 database rollback, backup restore, authentication, API contracts, audit rotation,
 and the Node.js control plane without adding Go application code. The

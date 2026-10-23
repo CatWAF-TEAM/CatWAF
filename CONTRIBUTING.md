@@ -1,6 +1,6 @@
 # Contributing to CatWAF
 
-Thanks for taking a look. CatWAF is source available under the [PolyForm Internal Use License](LICENSE) — the project can't accept code contributions (pull requests) right now, but bug reports, feature requests, and security disclosures via issues are genuinely welcome, and reading/running the code for your own use is exactly what the license is for.
+Thanks for taking a look. CatWAF Free is open source under the [MIT License](LICENSE). Bug reports, feature requests, security disclosures, and pull requests are welcome. By submitting a contribution, you agree that your contribution is licensed under the same MIT terms.
 
 ## Getting set up
 

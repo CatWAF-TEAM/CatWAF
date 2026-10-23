@@ -35,7 +35,7 @@ info:
     Traffic data comes from real audit records; a fresh installation returns empty arrays and zero counts.
     Database restoration is an offline CLI workflow, not an HTTP endpoint. See docs/security-recovery.md.
   license:
-    name: PolyForm Internal Use 1.0.0
+    name: MIT
     url: https://github.com/CatWAF-TEAM/CatWAF/blob/release-1.0.1/LICENSE
 externalDocs:
   description: Full documentation

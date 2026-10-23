@@ -8,7 +8,7 @@
 
 Node.js application and control plane, using the upstream Caddy/Coraza WAF engine and OWASP CRS.
 
-[![License: PolyForm Internal Use 1.0.0](https://img.shields.io/badge/license-PolyForm%20Internal%20Use%201.0.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-22%2B-brightgreen)](https://nodejs.org)
 [![Version](https://img.shields.io/badge/version-1.0.2-blue)](CHANGELOG.md)
 
@@ -506,7 +506,7 @@ largest single component of a Lite install — see
 
 ## Contributing
 
-Bug reports, feature requests, and security disclosures are welcome via issues — see [CONTRIBUTING.md](CONTRIBUTING.md). The project's license doesn't permit accepting code contributions right now. Run the test suites if you're reading the code:
+Bug reports, feature requests, security disclosures, and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Run the test suites if you're reading or changing the code:
 
 ```bash
 npm test                # security, CatAI, platform, and the real WAF end-to-end test
@@ -517,11 +517,9 @@ The end-to-end suite starts a local-only vulnerable app behind real Caddy + Cora
 
 ## License
 
-CatWAF is source available under the [PolyForm Internal Use License 1.0.0](LICENSE), plus an additional permission for personal, noncommercial use by individuals.
+CatWAF Free is open source under the [MIT License](LICENSE). You may use, modify, redistribute, and commercially use the code under its terms, including operating a managed service. Keep the copyright and license notice with copies or substantial portions.
 
-Running CatWAF to protect your own websites and applications — including public-facing ones — is internal business use and is covered.
-
-**Not covered:** redistributing CatWAF, or running it as a managed service on behalf of third parties. Contact agugusgeyehe@gmail.com for a commercial license.
+CatWAF Pro is a separate product and is not included in this license. Dependencies and bundled components retain their own licenses; see [NOTICE](NOTICE).
 
 "CatWAF" and its logo are trademarks, not covered by the software license — see [TRADEMARKS.md](TRADEMARKS.md).
 
